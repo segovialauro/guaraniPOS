@@ -24,7 +24,7 @@ public class SalePayment {
     @Column(name = "metodo_pago", nullable = false, length = 30)
     private String method;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "monto", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
     @Column(name = "referencia", length = 100)
