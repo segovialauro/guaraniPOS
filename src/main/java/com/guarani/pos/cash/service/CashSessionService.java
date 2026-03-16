@@ -33,6 +33,7 @@ import com.guarani.pos.cash.repository.CashSessionRepository;
 import com.guarani.pos.cash.security.CashPermission;
 import com.guarani.pos.company.model.Company;
 import com.guarani.pos.company.repository.CompanyRepository;
+import com.guarani.pos.sale.repository.SalePaymentRepository;
 import com.guarani.pos.sale.repository.SaleRepository;
 import com.lowagie.text.Document;
 import com.lowagie.text.Font;
@@ -49,16 +50,18 @@ public class CashSessionService {
 	private final CompanyRepository companyRepository;
 	private final UserRepository userRepository;
 	private final SaleRepository saleRepository;
+	private final SalePaymentRepository salePaymentRepository;
 	private final CashMovementRepository cashMovementRepository;
 	private final AuthorizationService authorizationService;
 
 	public CashSessionService(CashSessionRepository cashSessionRepository, CompanyRepository companyRepository,
-			UserRepository userRepository, SaleRepository saleRepository,
+			UserRepository userRepository, SaleRepository saleRepository, SalePaymentRepository salePaymentRepository,
 			CashMovementRepository cashMovementRepository, AuthorizationService authorizationService) {
 		this.cashSessionRepository = cashSessionRepository;
 		this.companyRepository = companyRepository;
 		this.userRepository = userRepository;
 		this.saleRepository = saleRepository;
+		this.salePaymentRepository = salePaymentRepository;
 		this.cashMovementRepository = cashMovementRepository;
 		this.authorizationService = authorizationService;
 	}
@@ -126,15 +129,15 @@ public class CashSessionService {
 		LocalDateTime to = LocalDateTime.now();
 
 		BigDecimal efectivo = nvl(
-				saleRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "EFECTIVO"));
-		BigDecimal transferencia = nvl(saleRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(),
+				salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "EFECTIVO"));
+		BigDecimal transferencia = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(),
 				from, to, "TRANSFERENCIA"));
-		BigDecimal debito = nvl(saleRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to,
+		BigDecimal debito = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to,
 				"TARJETA_DEBITO"));
-		BigDecimal credito = nvl(saleRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to,
+		BigDecimal credito = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to,
 				"TARJETA_CREDITO"));
 		BigDecimal qr = nvl(
-				saleRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "QR"));
+				salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "QR"));
 		BigDecimal total = nvl(saleRepository.sumByCompanyAndDateTimePeriod(cash.getCompany().getId(), from, to));
 
 		cash.setCashSystem(efectivo);

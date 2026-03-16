@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS venta_pago CASCADE;
 DROP TABLE IF EXISTS venta_detalle CASCADE;
 DROP TABLE IF EXISTS venta CASCADE;
 DROP TABLE IF EXISTS producto CASCADE;
@@ -21,6 +22,7 @@ CREATE TABLE empresa (
     estado VARCHAR(20) NOT NULL,
     licencia_estado VARCHAR(20) NOT NULL,
     licencia_vencimiento DATE NOT NULL,
+    ruc VARCHAR(20) UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -104,6 +106,8 @@ CREATE TABLE venta (
     fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     total NUMERIC(15,2) NOT NULL,
     metodo_pago VARCHAR(30) NOT NULL,
+    monto_recibido NUMERIC(15,2),
+    vuelto NUMERIC(15,2),
     estado VARCHAR(20) NOT NULL,
     observacion VARCHAR(500),
     creado_por_usuario_id BIGINT NULL,
@@ -268,7 +272,19 @@ create table if not exists caja_movimiento (
 
 create index if not exists idx_caja_movimiento_turno_fecha
     on caja_movimiento (caja_turno_id, fecha desc);
+
+CREATE TABLE venta_pago (
+    id BIGSERIAL PRIMARY KEY,
+    venta_id BIGINT NOT NULL,
+    caja_turno_id BIGINT NULL,
+    metodo_pago VARCHAR(30) NOT NULL,
+    monto NUMERIC(15,2) NOT NULL,
+    referencia VARCHAR(100),
+    CONSTRAINT fk_venta_pago_venta
+        FOREIGN KEY (venta_id) REFERENCES venta(id),
+    CONSTRAINT fk_venta_pago_caja_turno
+        FOREIGN KEY (caja_turno_id) REFERENCES caja_turno(id)
+);
+
     
-    ALTER TABLE empresa
-ADD COLUMN ruc VARCHAR(20) UNIQUE;
 

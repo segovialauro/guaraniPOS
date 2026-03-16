@@ -38,6 +38,12 @@ public class Sale {
     @Column(name = "metodo_pago", nullable = false, length = 30)
     private String metodoPago;
 
+    @Column(name = "monto_recibido", precision = 15, scale = 2)
+    private BigDecimal montoRecibido;
+
+    @Column(name = "vuelto", precision = 15, scale = 2)
+    private BigDecimal vuelto;
+
     @Column(nullable = false, length = 20)
     private String estado;
 
@@ -51,9 +57,17 @@ public class Sale {
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SaleDetail> details = new ArrayList<>();
 
+    @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SalePayment> payments = new ArrayList<>();
+
     public void addDetail(SaleDetail detail) {
         detail.setSale(this);
         this.details.add(detail);
+    }
+
+    public void addPayment(SalePayment payment) {
+        payment.setSale(this);
+        this.payments.add(payment);
     }
 
     public Long getId() { return id; }
@@ -69,6 +83,10 @@ public class Sale {
     public void setTotal(BigDecimal total) { this.total = total; }
     public String getMetodoPago() { return metodoPago; }
     public void setMetodoPago(String metodoPago) { this.metodoPago = metodoPago; }
+    public BigDecimal getMontoRecibido() { return montoRecibido; }
+    public void setMontoRecibido(BigDecimal montoRecibido) { this.montoRecibido = montoRecibido; }
+    public BigDecimal getVuelto() { return vuelto; }
+    public void setVuelto(BigDecimal vuelto) { this.vuelto = vuelto; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
     public String getObservacion() { return observacion; }
@@ -76,4 +94,5 @@ public class Sale {
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
     public List<SaleDetail> getDetails() { return details; }
+    public List<SalePayment> getPayments() { return payments; }
 }

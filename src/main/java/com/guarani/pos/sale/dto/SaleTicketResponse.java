@@ -16,6 +16,9 @@ public record SaleTicketResponse(
         String status,
         String observation,
         BigDecimal total,
+        BigDecimal amountReceived,
+        BigDecimal changeDue,
+        List<SalePaymentResponse> payments,
         List<SaleTicketDetailResponse> items
 ) {
 }

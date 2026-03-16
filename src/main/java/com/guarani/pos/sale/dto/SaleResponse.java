@@ -13,6 +13,9 @@ public record SaleResponse(
         String paymentMethod,
         String status,
         BigDecimal total,
+        BigDecimal amountReceived,
+        BigDecimal changeDue,
+        List<SalePaymentResponse> payments,
         List<SaleDetailResponse> items
 ) {
 }

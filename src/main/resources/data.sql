@@ -1,5 +1,5 @@
-INSERT INTO empresa (id, codigo, nombre, estado, licencia_estado, licencia_vencimiento)
-VALUES (1, 'demo', 'Empresa Demo Guaraní POS', 'ACTIVA', 'ACTIVA', '2030-12-31');
+INSERT INTO empresa (id, codigo, nombre, estado, licencia_estado, licencia_vencimiento, ruc)
+VALUES (1, 'demo', 'Empresa Demo Guaraní POS', 'ACTIVA', 'ACTIVA', '2030-12-31', '80012345-6');
 
 -- contraseña bcrypt de Admin123*
 INSERT INTO usuario (id, empresa_id, cedula, nombre_completo, password_hash, quick_pin, rol_codigo, estado)
@@ -42,6 +42,8 @@ INSERT INTO venta (
     fecha,
     total,
     metodo_pago,
+    monto_recibido,
+    vuelto,
     estado,
     observacion,
     creado_por_usuario_id
@@ -55,6 +57,8 @@ VALUES
     current_timestamp,
     150000,
     'EFECTIVO',
+    150000,
+    0,
     'CONFIRMADA',
     'Venta demo 1',
     1
@@ -67,6 +71,8 @@ VALUES
     current_timestamp,
     85000,
     'TRANSFERENCIA',
+    NULL,
+    0,
     'CONFIRMADA',
     'Venta demo 2',
     1
@@ -173,7 +179,19 @@ insert into pagare (
 SELECT setval(pg_get_serial_sequence('pagare', 'id'), COALESCE((SELECT MAX(id) FROM pagare), 1), true);
 SELECT setval(pg_get_serial_sequence('pagare_pago', 'id'), COALESCE((SELECT MAX(id) FROM pagare_pago), 1), true);
 
-UPDATE empresa
-SET ruc = '80012345-6'
-WHERE id = 1;
 
+
+
+insert into caja_turno (
+    id, empresa_id, usuario_id, fecha_apertura, monto_apertura, efectivo_sistema, transferencia_sistema,
+    tarjeta_debito_sistema, tarjeta_credito_sistema, qr_sistema, total_sistema, estado, observacion
+) values (
+    1, 1, 1, current_timestamp, 200000, 150000, 85000, 0, 0, 0, 235000, 'ABIERTA', 'Caja demo abierta'
+);
+
+insert into venta_pago (id, venta_id, caja_turno_id, metodo_pago, monto, referencia) values
+(1, 1, 1, 'EFECTIVO', 150000, null),
+(2, 2, 1, 'TRANSFERENCIA', 85000, 'TRX-DEMO-002');
+
+SELECT setval(pg_get_serial_sequence('caja_turno', 'id'), COALESCE((SELECT MAX(id) FROM caja_turno), 1), true);
+SELECT setval(pg_get_serial_sequence('venta_pago', 'id'), COALESCE((SELECT MAX(id) FROM venta_pago), 1), true);
