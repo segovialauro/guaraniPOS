@@ -1,6 +1,9 @@
 DROP TABLE IF EXISTS venta_pago CASCADE;
 DROP TABLE IF EXISTS venta_detalle CASCADE;
 DROP TABLE IF EXISTS venta CASCADE;
+DROP TABLE IF EXISTS configuracion_facturacion CASCADE;
+DROP TABLE IF EXISTS suscripcion_empresa CASCADE;
+DROP TABLE IF EXISTS suscripcion_plan CASCADE;
 DROP TABLE IF EXISTS producto CASCADE;
 DROP TABLE IF EXISTS cliente CASCADE;
 DROP TABLE IF EXISTS pagare_pago CASCADE;
@@ -286,5 +289,73 @@ CREATE TABLE venta_pago (
         FOREIGN KEY (caja_turno_id) REFERENCES caja_turno(id)
 );
 
-    
+CREATE TABLE suscripcion_plan (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(30) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    price_monthly NUMERIC(15,2) NOT NULL DEFAULT 0,
+    max_open_cash_sessions INT NOT NULL DEFAULT 1,
+    max_users INT,
+    max_branches INT,
+    allow_fiscal_printer BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_electronic_invoice BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_internal_ticket BOOLEAN NOT NULL DEFAULT TRUE,
+    allow_bancard_qr BOOLEAN NOT NULL DEFAULT FALSE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE TABLE suscripcion_empresa (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    plan_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    trial_ends_at TIMESTAMP,
+    notes VARCHAR(500),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_company_subscription_company
+        FOREIGN KEY (company_id) REFERENCES empresa(id),
+    CONSTRAINT fk_company_subscription_plan
+        FOREIGN KEY (plan_id) REFERENCES suscripcion_plan(id)
+);
+
+CREATE UNIQUE INDEX uq_empresa_plan_activo
+ON suscripcion_empresa (company_id)
+WHERE status = 'ACTIVE';
+
+CREATE TABLE configuracion_facturacion (
+    id BIGSERIAL PRIMARY KEY,
+    empresa_id BIGINT NOT NULL,
+    document_type VARCHAR(30) NOT NULL,
+    printer_brand VARCHAR(100),
+    printer_model VARCHAR(100),
+    printer_name VARCHAR(150),
+    establishment_code VARCHAR(20),
+    expedition_point VARCHAR(20),
+    invoice_footer VARCHAR(500),
+    sifen_environment VARCHAR(20),
+    commercial_name VARCHAR(150),
+    legal_name VARCHAR(150),
+    ruc VARCHAR(30),
+    phone VARCHAR(50),
+    address VARCHAR(250),
+    branch_name VARCHAR(100),
+    timbrado_number VARCHAR(50),
+    timbrado_validity VARCHAR(50),
+    invoice_number VARCHAR(50),
+    logo_data_url TEXT,
+    show_seller BOOLEAN NOT NULL DEFAULT TRUE,
+    show_vat_breakdown BOOLEAN NOT NULL DEFAULT FALSE,
+    show_set_qr BOOLEAN NOT NULL DEFAULT FALSE,
+    show_item_discount BOOLEAN NOT NULL DEFAULT FALSE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_configuracion_facturacion_empresa
+        FOREIGN KEY (empresa_id) REFERENCES empresa(id)
+);
