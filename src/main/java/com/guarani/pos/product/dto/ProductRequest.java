@@ -34,6 +34,9 @@ public record ProductRequest(
 
         @NotBlank @Size(max = 30)
         String unidadMedida,
+
+        @NotBlank @Size(max = 10)
+        String vatType,
         
         @Size(max = 100)
         String codigoBarras,

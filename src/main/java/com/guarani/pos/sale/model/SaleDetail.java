@@ -36,6 +36,9 @@ public class SaleDetail {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
 
+    @Column(name = "vat_type", nullable = false, length = 10)
+    private String vatType;
+
     public Long getId() { return id; }
     public Sale getSale() { return sale; }
     public void setSale(Sale sale) { this.sale = sale; }
@@ -51,4 +54,6 @@ public class SaleDetail {
     public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
+    public String getVatType() { return vatType; }
+    public void setVatType(String vatType) { this.vatType = vatType; }
 }

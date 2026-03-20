@@ -7,6 +7,7 @@ public record SaleTicketDetailResponse(
         String productName,
         BigDecimal quantity,
         BigDecimal unitPrice,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        String vatType
 ) {
 }

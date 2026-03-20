@@ -23,6 +23,9 @@ public class Customer {
     @Column(length = 30)
     private String documento;
 
+    @Column(name = "document_type", length = 30)
+    private String documentType;
+
     @Column(length = 30)
     private String ruc;
 
@@ -34,6 +37,15 @@ public class Customer {
 
     @Column(length = 250)
     private String direccion;
+
+    @Column(name = "gender", length = 30)
+    private String gender;
+
+    @Column(name = "segment", length = 30)
+    private String segment;
+
+    @Column(name = "tax_profile", length = 30)
+    private String taxProfile;
 
     @Column(length = 500)
     private String observacion;
@@ -59,6 +71,8 @@ public class Customer {
     public void setNombre(String nombre) { this.nombre = nombre; }
     public String getDocumento() { return documento; }
     public void setDocumento(String documento) { this.documento = documento; }
+    public String getDocumentType() { return documentType; }
+    public void setDocumentType(String documentType) { this.documentType = documentType; }
     public String getRuc() { return ruc; }
     public void setRuc(String ruc) { this.ruc = ruc; }
     public String getTelefono() { return telefono; }
@@ -67,6 +81,12 @@ public class Customer {
     public void setEmail(String email) { this.email = email; }
     public String getDireccion() { return direccion; }
     public void setDireccion(String direccion) { this.direccion = direccion; }
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+    public String getSegment() { return segment; }
+    public void setSegment(String segment) { this.segment = segment; }
+    public String getTaxProfile() { return taxProfile; }
+    public void setTaxProfile(String taxProfile) { this.taxProfile = taxProfile; }
     public String getObservacion() { return observacion; }
     public void setObservacion(String observacion) { this.observacion = observacion; }
     public boolean isActivo() { return activo; }

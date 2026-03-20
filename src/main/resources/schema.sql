@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS venta CASCADE;
 DROP TABLE IF EXISTS configuracion_facturacion CASCADE;
 DROP TABLE IF EXISTS suscripcion_empresa CASCADE;
 DROP TABLE IF EXISTS suscripcion_plan CASCADE;
+DROP TABLE IF EXISTS parametro_general CASCADE;
 DROP TABLE IF EXISTS producto CASCADE;
 DROP TABLE IF EXISTS cliente CASCADE;
 DROP TABLE IF EXISTS pagare_pago CASCADE;
@@ -43,6 +44,23 @@ CREATE TABLE usuario (
     UNIQUE (empresa_id, quick_pin)
 );
 
+CREATE TABLE parametro_general (
+    id BIGSERIAL PRIMARY KEY,
+    empresa_id BIGINT NULL REFERENCES empresa(id),
+    group_code VARCHAR(50) NOT NULL,
+    code VARCHAR(50) NOT NULL,
+    label VARCHAR(150) NOT NULL,
+    description VARCHAR(300),
+    sort_order INT NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    system_defined BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX uq_parametro_general_scope
+    ON parametro_general (COALESCE(empresa_id, 0), group_code, code);
+
 CREATE TABLE producto (
     id BIGSERIAL PRIMARY KEY,
     empresa_id BIGINT NOT NULL,
@@ -55,6 +73,7 @@ CREATE TABLE producto (
     stock_actual NUMERIC(15,2) NOT NULL DEFAULT 0,
     stock_minimo NUMERIC(15,2) NOT NULL DEFAULT 0,
     unidad_medida VARCHAR(30) NOT NULL DEFAULT 'UNIDAD',
+    vat_type VARCHAR(10) NOT NULL DEFAULT 'IVA_10',
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -70,10 +89,14 @@ CREATE TABLE cliente (
     empresa_id BIGINT NOT NULL,
     nombre VARCHAR(150) NOT NULL,
     documento VARCHAR(30),
+    document_type VARCHAR(30),
     ruc VARCHAR(30),
     telefono VARCHAR(30),
     email VARCHAR(150),
     direccion VARCHAR(250),
+    gender VARCHAR(30),
+    segment VARCHAR(30),
+    tax_profile VARCHAR(30),
     observacion VARCHAR(500),
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -134,6 +157,7 @@ CREATE TABLE venta_detalle (
     cantidad NUMERIC(15,2) NOT NULL,
     precio_unitario NUMERIC(15,2) NOT NULL,
     subtotal NUMERIC(15,2) NOT NULL,
+    vat_type VARCHAR(10) NOT NULL DEFAULT 'IVA_10',
     CONSTRAINT fk_venta_detalle_venta
         FOREIGN KEY (venta_id) REFERENCES venta(id),
     CONSTRAINT fk_venta_detalle_producto

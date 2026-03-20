@@ -71,10 +71,14 @@ public class CustomerService {
     private void apply(Customer customer, CustomerRequest request) {
         customer.setNombre(request.nombre().trim());
         customer.setDocumento(request.documento());
+        customer.setDocumentType(request.documentType());
         customer.setRuc(request.ruc());
         customer.setTelefono(request.telefono());
         customer.setEmail(request.email());
         customer.setDireccion(request.direccion());
+        customer.setGender(request.gender());
+        customer.setSegment(request.segment());
+        customer.setTaxProfile(request.taxProfile());
         customer.setObservacion(request.observacion());
         customer.setActivo(request.activo());
     }
@@ -84,10 +88,14 @@ public class CustomerService {
                 c.getId(),
                 c.getNombre(),
                 c.getDocumento(),
+                c.getDocumentType(),
                 c.getRuc(),
                 c.getTelefono(),
                 c.getEmail(),
                 c.getDireccion(),
+                c.getGender(),
+                c.getSegment(),
+                c.getTaxProfile(),
                 c.getObservacion(),
                 c.isActivo()
         );

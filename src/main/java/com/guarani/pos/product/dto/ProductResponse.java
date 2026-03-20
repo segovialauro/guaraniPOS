@@ -13,6 +13,7 @@ public record ProductResponse(
         BigDecimal stockActual,
         BigDecimal stockMinimo,
         String unidadMedida,
+        String vatType,
         boolean activo,
         String qrContenido,
         String codigoBarras

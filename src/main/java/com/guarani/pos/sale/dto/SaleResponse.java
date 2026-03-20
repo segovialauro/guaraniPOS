@@ -16,6 +16,7 @@ public record SaleResponse(
         BigDecimal amountReceived,
         BigDecimal changeDue,
         List<SalePaymentResponse> payments,
-        List<SaleDetailResponse> items
+        List<SaleDetailResponse> items,
+        SaleVatSummaryResponse vatSummary
 ) {
 }

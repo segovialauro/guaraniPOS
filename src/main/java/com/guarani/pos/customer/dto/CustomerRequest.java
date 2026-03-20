@@ -11,6 +11,9 @@ public record CustomerRequest(
         String documento,
 
         @Size(max = 30)
+        String documentType,
+
+        @Size(max = 30)
         String ruc,
 
         @Size(max = 30)
@@ -21,6 +24,15 @@ public record CustomerRequest(
 
         @Size(max = 250)
         String direccion,
+
+        @Size(max = 30)
+        String gender,
+
+        @Size(max = 30)
+        String segment,
+
+        @Size(max = 30)
+        String taxProfile,
 
         @Size(max = 500)
         String observacion,

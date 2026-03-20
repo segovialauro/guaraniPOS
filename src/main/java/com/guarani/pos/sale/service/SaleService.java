@@ -37,6 +37,7 @@ import com.guarani.pos.sale.dto.SalePaymentResponse;
 import com.guarani.pos.sale.dto.SaleResponse;
 import com.guarani.pos.sale.dto.SaleTicketDetailResponse;
 import com.guarani.pos.sale.dto.SaleTicketResponse;
+import com.guarani.pos.sale.dto.SaleVatSummaryResponse;
 import com.guarani.pos.sale.model.Sale;
 import com.guarani.pos.sale.model.SaleDetail;
 import com.guarani.pos.sale.model.SalePayment;
@@ -139,6 +140,7 @@ public class SaleService {
             detail.setCantidad(item.quantity());
             detail.setPrecioUnitario(product.getPrecioVenta());
             detail.setSubtotal(subtotal);
+            detail.setVatType(normalizeVatType(product.getVatType()));
             sale.addDetail(detail);
 
             product.setStockActual(product.getStockActual().subtract(item.quantity()));
@@ -268,8 +270,10 @@ public class SaleService {
                         .toList(),
                 sale.getDetails().stream()
                         .map(d -> new SaleDetailResponse(d.getProduct().getId(), d.getProductoCodigo(),
-                                d.getProductoNombre(), d.getCantidad(), d.getPrecioUnitario(), d.getSubtotal()))
-                        .toList());
+                                d.getProductoNombre(), d.getCantidad(), d.getPrecioUnitario(), d.getSubtotal(),
+                                normalizeVatType(d.getVatType())))
+                        .toList(),
+                calculateVatSummary(sale.getDetails()));
     }
 
     @Transactional(readOnly = true)
@@ -307,8 +311,10 @@ public class SaleService {
                                 d.getProductoNombre(),
                                 d.getCantidad(),
                                 d.getPrecioUnitario(),
-                                d.getSubtotal()))
-                        .toList());
+                                d.getSubtotal(),
+                                normalizeVatType(d.getVatType())))
+                        .toList(),
+                calculateVatSummary(sale.getDetails()));
     }
 
     @Transactional(readOnly = true)
@@ -347,13 +353,19 @@ public class SaleService {
             document.add(new Paragraph("Estado: " + safe(ticket.status()), normalFont));
             document.add(new Paragraph(" ", normalFont));
 
-            PdfPTable table = new PdfPTable(2);
+            PdfPTable table = new PdfPTable(4);
             table.setWidthPercentage(100);
-            table.setWidths(new float[]{4f, 2f});
+            table.setWidths(new float[]{4f, 1.4f, 1.6f, 2f});
+
+            table.addCell("Producto");
+            table.addCell("Cant.");
+            table.addCell("IVA");
+            table.addCell("Total");
 
             for (SaleTicketDetailResponse item : ticket.items()) {
-                String left = item.quantity().stripTrailingZeros().toPlainString() + " x " + safe(item.productName());
-                table.addCell(left);
+                table.addCell(safe(item.productName()));
+                table.addCell(item.quantity().stripTrailingZeros().toPlainString());
+                table.addCell(labelForVatType(item.vatType()));
                 table.addCell(formatMoney(item.subtotal()));
             }
             document.add(table);
@@ -376,6 +388,17 @@ public class SaleService {
             total.setAlignment(Paragraph.ALIGN_RIGHT);
             total.setSpacingBefore(8f);
             document.add(total);
+
+            if (ticket.vatSummary() != null) {
+                document.add(new Paragraph(" ", normalFont));
+                document.add(new Paragraph("Liquidacion IVA", boldFont));
+                document.add(new Paragraph("Gravada 10%: " + formatMoney(ticket.vatSummary().taxableVat10()), normalFont));
+                document.add(new Paragraph("Gravada 5%: " + formatMoney(ticket.vatSummary().taxableVat5()), normalFont));
+                document.add(new Paragraph("Exentas: " + formatMoney(ticket.vatSummary().exemptTotal()), normalFont));
+                document.add(new Paragraph("IVA 10%: " + formatMoney(ticket.vatSummary().vat10()), normalFont));
+                document.add(new Paragraph("IVA 5%: " + formatMoney(ticket.vatSummary().vat5()), normalFont));
+                document.add(new Paragraph("Total IVA: " + formatMoney(ticket.vatSummary().totalVat()), boldFont));
+            }
 
             if (ticket.observation() != null && !ticket.observation().isBlank()) {
                 document.add(new Paragraph(" ", normalFont));
@@ -420,6 +443,58 @@ public class SaleService {
             case "TARJETA_CREDITO" -> "tarjeta crédito";
             case "QR" -> "QR";
             default -> method;
+        };
+    }
+
+    private SaleVatSummaryResponse calculateVatSummary(List<SaleDetail> details) {
+        BigDecimal taxableVat10 = BigDecimal.ZERO;
+        BigDecimal taxableVat5 = BigDecimal.ZERO;
+        BigDecimal exemptTotal = BigDecimal.ZERO;
+        BigDecimal vat10 = BigDecimal.ZERO;
+        BigDecimal vat5 = BigDecimal.ZERO;
+
+        for (SaleDetail detail : details) {
+            BigDecimal subtotal = nvl(detail.getSubtotal());
+            String vatType = normalizeVatType(detail.getVatType());
+
+            switch (vatType) {
+                case "IVA_10" -> {
+                    taxableVat10 = taxableVat10.add(subtotal);
+                    vat10 = vat10.add(subtotal.divide(BigDecimal.valueOf(11), 2, java.math.RoundingMode.HALF_UP));
+                }
+                case "IVA_5" -> {
+                    taxableVat5 = taxableVat5.add(subtotal);
+                    vat5 = vat5.add(subtotal.divide(BigDecimal.valueOf(21), 2, java.math.RoundingMode.HALF_UP));
+                }
+                case "EXENTO" -> exemptTotal = exemptTotal.add(subtotal);
+                default -> {
+                }
+            }
+        }
+
+        return new SaleVatSummaryResponse(
+                taxableVat10,
+                taxableVat5,
+                exemptTotal,
+                vat10,
+                vat5,
+                vat10.add(vat5));
+    }
+
+    private String normalizeVatType(String vatType) {
+        String normalized = vatType == null ? "IVA_10" : vatType.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "IVA_10", "IVA_5", "EXENTO" -> normalized;
+            default -> "IVA_10";
+        };
+    }
+
+    private String labelForVatType(String vatType) {
+        return switch (normalizeVatType(vatType)) {
+            case "IVA_10" -> "10%";
+            case "IVA_5" -> "5%";
+            case "EXENTO" -> "EX";
+            default -> "-";
         };
     }
 }

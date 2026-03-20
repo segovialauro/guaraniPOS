@@ -14,19 +14,41 @@ VALUES (
     'ACTIVO'
 );
 
-INSERT INTO producto
-(id, empresa_id, codigo, nombre, descripcion, categoria, precio_costo, precio_venta, stock_actual, stock_minimo, unidad_medida, activo)
+INSERT INTO parametro_general (group_code, code, label, description, sort_order, active, system_defined)
 VALUES
-(1, 1, 'ZAP-001', 'Zapato deportivo negro', 'Calzado deportivo urbano', 'Calzados', 120000, 185000, 8, 3, 'PAR', TRUE),
-(2, 1, 'OJT-001', 'Ojota clásica azul', 'Ojota liviana de verano', 'Calzados', 25000, 45000, 20, 5, 'PAR', TRUE),
-(3, 1, 'MED-001', 'Media deportiva blanca', 'Media de algodón', 'Accesorios', 8000, 15000, 50, 10, 'PAR', TRUE);
+('PRODUCT_CATEGORY', 'Calzados', 'Calzados', 'Categoria para calzados y zapatillas.', 10, TRUE, TRUE),
+('PRODUCT_CATEGORY', 'Accesorios', 'Accesorios', 'Categoria para medias, cinturones y complementos.', 20, TRUE, TRUE),
+('PRODUCT_CATEGORY', 'Liquidos', 'Liquidos', 'Categoria para bebidas y combustibles.', 30, TRUE, TRUE),
+('UNIT_MEASURE', 'UNIDAD', 'Unidad', 'Unidad individual.', 10, TRUE, TRUE),
+('UNIT_MEASURE', 'PAR', 'Par', 'Unidad de venta en pares.', 20, TRUE, TRUE),
+('UNIT_MEASURE', 'CAJA', 'Caja', 'Unidad de venta en cajas.', 30, TRUE, TRUE),
+('UNIT_MEASURE', 'LITRO', 'Litro', 'Unidad de volumen.', 40, TRUE, TRUE),
+('CUSTOMER_DOCUMENT_TYPE', 'CI', 'Cedula', 'Documento de identidad.', 10, TRUE, TRUE),
+('CUSTOMER_DOCUMENT_TYPE', 'RUC', 'RUC', 'Registro Unico del Contribuyente.', 20, TRUE, TRUE),
+('CUSTOMER_DOCUMENT_TYPE', 'PASAPORTE', 'Pasaporte', 'Documento para clientes extranjeros.', 30, TRUE, TRUE),
+('CUSTOMER_GENDER', 'FEMENINO', 'Femenino', 'Genero femenino.', 10, TRUE, TRUE),
+('CUSTOMER_GENDER', 'MASCULINO', 'Masculino', 'Genero masculino.', 20, TRUE, TRUE),
+('CUSTOMER_GENDER', 'OTRO', 'Otro', 'Genero no especificado.', 30, TRUE, TRUE),
+('CUSTOMER_SEGMENT', 'MINORISTA', 'Minorista', 'Cliente de venta al detalle.', 10, TRUE, TRUE),
+('CUSTOMER_SEGMENT', 'MAYORISTA', 'Mayorista', 'Cliente de venta por volumen.', 20, TRUE, TRUE),
+('CUSTOMER_SEGMENT', 'VIP', 'VIP', 'Cliente de atencion preferencial.', 30, TRUE, TRUE),
+('CUSTOMER_TAX_PROFILE', 'CONTRIBUYENTE', 'Contribuyente', 'Cliente con tratamiento fiscal normal.', 10, TRUE, TRUE),
+('CUSTOMER_TAX_PROFILE', 'CONSUMIDOR_FINAL', 'Consumidor final', 'Cliente consumidor final.', 20, TRUE, TRUE),
+('CUSTOMER_TAX_PROFILE', 'EXTERIOR', 'Exterior', 'Cliente del exterior.', 30, TRUE, TRUE);
+
+INSERT INTO producto
+(id, empresa_id, codigo, nombre, descripcion, categoria, precio_costo, precio_venta, stock_actual, stock_minimo, unidad_medida, vat_type, activo)
+VALUES
+(1, 1, 'ZAP-001', 'Zapato deportivo negro', 'Calzado deportivo urbano', 'Calzados', 120000, 185000, 8, 3, 'PAR', 'IVA_10', TRUE),
+(2, 1, 'OJT-001', 'Ojota clásica azul', 'Ojota liviana de verano', 'Calzados', 25000, 45000, 20, 5, 'PAR', 'IVA_10', TRUE),
+(3, 1, 'MED-001', 'Media deportiva blanca', 'Media de algodón', 'Accesorios', 8000, 15000, 50, 10, 'PAR', 'IVA_5', TRUE);
 
 INSERT INTO cliente
-(id, empresa_id, nombre, documento, ruc, telefono, email, direccion, observacion, activo)
+(id, empresa_id, nombre, documento, document_type, ruc, telefono, email, direccion, gender, segment, tax_profile, observacion, activo)
 VALUES
-(1, 1, 'Juan Pérez', '1234567', NULL, '0981123456', 'juanperez@gmail.com', 'San Lorenzo', 'Cliente frecuente', TRUE),
-(2, 1, 'María Gómez', '2345678', NULL, '0991456789', 'mariagomez@gmail.com', 'Fernando de la Mora', '', TRUE),
-(3, 1, 'Comercial Central SRL', NULL, '80012345-6', '021555444', 'ventas@comercialcentral.com', 'Asunción', 'Compra con factura', TRUE);
+(1, 1, 'Juan Pérez', '1234567', 'CI', NULL, '0981123456', 'juanperez@gmail.com', 'San Lorenzo', 'MASCULINO', 'MINORISTA', 'CONSUMIDOR_FINAL', 'Cliente frecuente', TRUE),
+(2, 1, 'María Gómez', '2345678', 'CI', NULL, '0991456789', 'mariagomez@gmail.com', 'Fernando de la Mora', 'FEMENINO', 'MINORISTA', 'CONSUMIDOR_FINAL', '', TRUE),
+(3, 1, 'Comercial Central SRL', NULL, 'RUC', '80012345-6', '021555444', 'ventas@comercialcentral.com', 'Asunción', NULL, 'MAYORISTA', 'CONTRIBUYENTE', 'Compra con factura', TRUE);
 
 INSERT INTO stock (id, empresa_id, producto_nombre, current_stock, min_stock)
 VALUES
@@ -86,14 +108,16 @@ INSERT INTO venta_detalle (
     producto_nombre,
     cantidad,
     precio_unitario,
-    subtotal
+    subtotal,
+    vat_type
 )
 VALUES
-(1, 1, 1, 'ZAP-001', 'Zapato deportivo negro', 1, 150000, 150000),
-(2, 2, 2, 'OJT-001', 'Ojota clásica azul', 1, 85000, 85000);
+(1, 1, 1, 'ZAP-001', 'Zapato deportivo negro', 1, 150000, 150000, 'IVA_10'),
+(2, 2, 2, 'OJT-001', 'Ojota clásica azul', 1, 85000, 85000, 'IVA_10');
 
 SELECT setval(pg_get_serial_sequence('empresa', 'id'), COALESCE((SELECT MAX(id) FROM empresa), 1), true);
 SELECT setval(pg_get_serial_sequence('usuario', 'id'), COALESCE((SELECT MAX(id) FROM usuario), 1), true);
+SELECT setval(pg_get_serial_sequence('parametro_general', 'id'), COALESCE((SELECT MAX(id) FROM parametro_general), 1), true);
 SELECT setval(pg_get_serial_sequence('producto', 'id'), COALESCE((SELECT MAX(id) FROM producto), 1), true);
 SELECT setval(pg_get_serial_sequence('cliente', 'id'), COALESCE((SELECT MAX(id) FROM cliente), 1), true);
 SELECT setval(pg_get_serial_sequence('stock', 'id'), COALESCE((SELECT MAX(id) FROM stock), 1), true);
@@ -241,3 +265,7 @@ SELECT
     'Plan inicial'
 FROM suscripcion_plan sp
 WHERE sp.code = 'PRO';
+
+
+
+

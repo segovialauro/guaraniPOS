@@ -68,6 +68,9 @@ public class Product {
 	@Column(name = "codigo_barras", length = 100)
 	private String codigoBarras;
 
+	@Column(name = "vat_type", nullable = false, length = 10)
+	private String vatType = "IVA_10";
+
 
 	@PreUpdate
 	public void preUpdate() {
@@ -188,5 +191,13 @@ public class Product {
 
 	public void setQrContenido(String qrContenido) {
 		this.qrContenido = qrContenido;
+	}
+
+	public String getVatType() {
+		return vatType;
+	}
+
+	public void setVatType(String vatType) {
+		this.vatType = vatType;
 	}
 }

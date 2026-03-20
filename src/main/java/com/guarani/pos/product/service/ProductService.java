@@ -106,6 +106,7 @@ public class ProductService {
         product.setStockActual(request.stockActual());
         product.setStockMinimo(request.stockMinimo());
         product.setUnidadMedida(request.unidadMedida().trim());
+        product.setVatType(normalizeVatType(request.vatType()));
         product.setActivo(request.activo());
         product.setCodigoBarras(request.codigoBarras());
     }
@@ -122,9 +123,18 @@ public class ProductService {
                 product.getStockActual(),
                 product.getStockMinimo(),
                 product.getUnidadMedida(),
+                product.getVatType(),
                 product.isActivo(),
                 product.getQrContenido(),
                 product.getCodigoBarras()
         );
+    }
+
+    private String normalizeVatType(String vatType) {
+        String normalized = vatType == null ? "" : vatType.trim().toUpperCase();
+        return switch (normalized) {
+            case "IVA_10", "IVA_5", "EXENTO" -> normalized;
+            default -> throw new IllegalArgumentException("Tipo de IVA inv\u00e1lido.");
+        };
     }
 }
