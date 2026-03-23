@@ -34,6 +34,9 @@ public class SubscriptionPlan {
     @Column(name = "max_branches")
     private Integer maxBranches;
 
+    @Column(name = "max_monthly_purchases")
+    private Integer maxMonthlyPurchases;
+
     @Column(name = "allow_fiscal_printer", nullable = false)
     private boolean allowFiscalPrinter = false;
 
@@ -118,6 +121,14 @@ public class SubscriptionPlan {
 
     public void setMaxBranches(Integer maxBranches) {
         this.maxBranches = maxBranches;
+    }
+
+    public Integer getMaxMonthlyPurchases() {
+        return maxMonthlyPurchases;
+    }
+
+    public void setMaxMonthlyPurchases(Integer maxMonthlyPurchases) {
+        this.maxMonthlyPurchases = maxMonthlyPurchases;
     }
 
     public boolean isAllowFiscalPrinter() {

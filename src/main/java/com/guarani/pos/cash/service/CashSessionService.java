@@ -117,9 +117,16 @@ public class CashSessionService {
 		cash = refreshTotals(cash);
 
 		BigDecimal expectedCash = calculateExpectedCash(cash);
+		BigDecimal difference = request.cashCounted().subtract(expectedCash);
+
+		if (difference.compareTo(BigDecimal.ZERO) != 0
+				&& (request.observation() == null || request.observation().isBlank())) {
+			throw new IllegalArgumentException(
+					"Debe registrar una observacion cuando existe diferencia en el cierre de caja.");
+		}
 
 		cash.setCashCounted(request.cashCounted());
-		cash.setDifference(request.cashCounted().subtract(expectedCash));
+		cash.setDifference(difference);
 		cash.setClosedAt(LocalDateTime.now());
 		cash.setEstado("CERRADA");
 
@@ -194,7 +201,8 @@ public class CashSessionService {
 				nvl(cash.getOpeningAmount()), nvl(cash.getCashSystem()), nvl(cash.getTransferSystem()),
 				nvl(cash.getDebitCardSystem()), nvl(cash.getCreditCardSystem()), nvl(cash.getQrSystem()),
 				nvl(cash.getTotalSystem()), manualIncomeTotal, manualWithdrawalTotal, expectedCash,
-				nvl(cash.getCashCounted()), nvl(cash.getDifference()), cash.getEstado(), cash.getObservacion());
+				nvl(cash.getCashCounted()), nvl(cash.getDifference()), differenceLabel(cash.getDifference()),
+				cash.getEstado(), cash.getObservacion());
 	}
 
 	@Transactional(readOnly = true)

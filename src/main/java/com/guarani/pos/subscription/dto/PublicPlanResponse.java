@@ -10,6 +10,7 @@ public record PublicPlanResponse(
         Integer maxOpenCashSessions,
         Integer maxUsers,
         Integer maxBranches,
+        Integer maxMonthlyPurchases,
         boolean allowInternalTicket,
         boolean allowFiscalPrinter,
         boolean allowElectronicInvoice,

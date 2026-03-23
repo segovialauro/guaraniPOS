@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -35,4 +36,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	long countActiveUsers(Long companyId);
 
 	Optional<User> findById(Long id);
+
+    List<User> findByCompanyIdOrderByFullNameAsc(Long companyId);
+
+    boolean existsByCompanyIdAndCedulaIgnoreCase(Long companyId, String cedula);
+
+    boolean existsByCompanyIdAndCedulaIgnoreCaseAndIdNot(Long companyId, String cedula, Long id);
+
+    boolean existsByCompanyIdAndQuickPin(Long companyId, String quickPin);
+
+    boolean existsByCompanyIdAndQuickPinAndIdNot(Long companyId, String quickPin, Long id);
 }

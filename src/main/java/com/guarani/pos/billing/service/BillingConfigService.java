@@ -1,5 +1,6 @@
 package com.guarani.pos.billing.service;
 
+import java.time.LocalDate;
 import java.util.Locale;
 
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class BillingConfigService {
         String documentType = normalize(request.documentType());
 
         validatePlanAccess(companyId, documentType);
+        validateFiscalRules(request);
 
         BillingConfig config = billingConfigRepository.findFirstByCompany_IdOrderByIdDesc(companyId)
                 .orElseGet(() -> {
@@ -92,6 +94,13 @@ public class BillingConfigService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void validateFiscalRules(BillingConfigRequest request) {
+        LocalDate validityDate = LocalDate.parse(request.timbradoValidity());
+        if (validityDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La vigencia del timbrado ya esta vencida.");
+        }
     }
 
     private BillingConfigResponse toResponse(BillingConfig config) {

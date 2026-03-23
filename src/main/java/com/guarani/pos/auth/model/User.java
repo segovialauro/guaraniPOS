@@ -35,10 +35,17 @@ public class User {
 
     public Long getId() { return id; }
     public Company getCompany() { return company; }
+    public void setCompany(Company company) { this.company = company; }
     public String getCedula() { return cedula; }
+    public void setCedula(String cedula) { this.cedula = cedula; }
     public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
     public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public String getQuickPin() { return quickPin; }
+    public void setQuickPin(String quickPin) { this.quickPin = quickPin; }
     public String getRoleCode() { return roleCode; }
+    public void setRoleCode(String roleCode) { this.roleCode = roleCode; }
     public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

@@ -1,7 +1,7 @@
 INSERT INTO empresa (id, codigo, nombre, estado, licencia_estado, licencia_vencimiento, ruc)
-VALUES (1, 'demo', 'Empresa Demo Guaraní POS', 'ACTIVA', 'ACTIVA', '2030-12-31', '80012345-6');
+VALUES (1, 'demo', 'Empresa Demo Guarani POS', 'ACTIVA', 'ACTIVA', '2030-12-31', '80012345-6');
 
--- contraseña bcrypt de Admin123*
+-- contrasena bcrypt de Admin123*
 INSERT INTO usuario (id, empresa_id, cedula, nombre_completo, password_hash, quick_pin, rol_codigo, estado)
 VALUES (
     1,
@@ -34,26 +34,33 @@ VALUES
 ('CUSTOMER_SEGMENT', 'VIP', 'VIP', 'Cliente de atencion preferencial.', 30, TRUE, TRUE),
 ('CUSTOMER_TAX_PROFILE', 'CONTRIBUYENTE', 'Contribuyente', 'Cliente con tratamiento fiscal normal.', 10, TRUE, TRUE),
 ('CUSTOMER_TAX_PROFILE', 'CONSUMIDOR_FINAL', 'Consumidor final', 'Cliente consumidor final.', 20, TRUE, TRUE),
-('CUSTOMER_TAX_PROFILE', 'EXTERIOR', 'Exterior', 'Cliente del exterior.', 30, TRUE, TRUE);
+('CUSTOMER_TAX_PROFILE', 'EXTERIOR', 'Exterior', 'Cliente del exterior.', 30, TRUE, TRUE),
+('INVENTORY_ADJUSTMENT_REASON', 'CONTEO_FISICO', 'Conteo fisico', 'Ajuste por conteo fisico de inventario.', 10, TRUE, TRUE),
+('INVENTORY_ADJUSTMENT_REASON', 'MERCADERIA_ENCONTRADA', 'Mercaderia encontrada', 'Ingreso por mercaderia localizada posteriormente.', 20, TRUE, TRUE),
+('INVENTORY_ADJUSTMENT_REASON', 'MERMA', 'Merma o danio', 'Salida por merma, vencimiento o danio.', 30, TRUE, TRUE),
+('INVENTORY_ADJUSTMENT_REASON', 'CORRECCION_SISTEMA', 'Correccion de sistema', 'Correccion administrativa de stock.', 40, TRUE, TRUE),
+('POS_DISCOUNT_POLICY', 'CAJERO_MAX_PERCENT', '10', 'Porcentaje maximo de descuento permitido para cajero.', 10, TRUE, TRUE),
+('POS_DISCOUNT_POLICY', 'SUPERVISOR_MAX_PERCENT', '25', 'Porcentaje maximo de descuento permitido para supervisor.', 20, TRUE, TRUE),
+('POS_DISCOUNT_POLICY', 'ADMIN_MAX_PERCENT', '100', 'Porcentaje maximo de descuento permitido para administrador.', 30, TRUE, TRUE);
 
 INSERT INTO producto
 (id, empresa_id, codigo, nombre, descripcion, categoria, precio_costo, precio_venta, stock_actual, stock_minimo, unidad_medida, vat_type, activo)
 VALUES
 (1, 1, 'ZAP-001', 'Zapato deportivo negro', 'Calzado deportivo urbano', 'Calzados', 120000, 185000, 8, 3, 'PAR', 'IVA_10', TRUE),
-(2, 1, 'OJT-001', 'Ojota clásica azul', 'Ojota liviana de verano', 'Calzados', 25000, 45000, 20, 5, 'PAR', 'IVA_10', TRUE),
-(3, 1, 'MED-001', 'Media deportiva blanca', 'Media de algodón', 'Accesorios', 8000, 15000, 50, 10, 'PAR', 'IVA_5', TRUE);
+(2, 1, 'OJT-001', 'Ojota clasica azul', 'Ojota liviana de verano', 'Calzados', 25000, 45000, 20, 5, 'PAR', 'IVA_10', TRUE),
+(3, 1, 'MED-001', 'Media deportiva blanca', 'Media de algodon', 'Accesorios', 8000, 15000, 50, 10, 'PAR', 'IVA_5', TRUE);
 
 INSERT INTO cliente
 (id, empresa_id, nombre, documento, document_type, ruc, telefono, email, direccion, gender, segment, tax_profile, observacion, activo)
 VALUES
-(1, 1, 'Juan Pérez', '1234567', 'CI', NULL, '0981123456', 'juanperez@gmail.com', 'San Lorenzo', 'MASCULINO', 'MINORISTA', 'CONSUMIDOR_FINAL', 'Cliente frecuente', TRUE),
-(2, 1, 'María Gómez', '2345678', 'CI', NULL, '0991456789', 'mariagomez@gmail.com', 'Fernando de la Mora', 'FEMENINO', 'MINORISTA', 'CONSUMIDOR_FINAL', '', TRUE),
-(3, 1, 'Comercial Central SRL', NULL, 'RUC', '80012345-6', '021555444', 'ventas@comercialcentral.com', 'Asunción', NULL, 'MAYORISTA', 'CONTRIBUYENTE', 'Compra con factura', TRUE);
+(1, 1, 'Juan Perez', '1234567', 'CI', NULL, '0981123456', 'juanperez@gmail.com', 'San Lorenzo', 'MASCULINO', 'MINORISTA', 'CONSUMIDOR_FINAL', 'Cliente frecuente', TRUE),
+(2, 1, 'Maria Gomez', '2345678', 'CI', NULL, '0991456789', 'mariagomez@gmail.com', 'Fernando de la Mora', 'FEMENINO', 'MINORISTA', 'CONSUMIDOR_FINAL', '', TRUE),
+(3, 1, 'Comercial Central SRL', NULL, 'RUC', '80012345-6', '021555444', 'ventas@comercialcentral.com', 'Asuncion', NULL, 'MAYORISTA', 'CONTRIBUYENTE', 'Compra con factura', TRUE);
 
 INSERT INTO stock (id, empresa_id, producto_nombre, current_stock, min_stock)
 VALUES
 (1, 1, 'Zapato deportivo negro', 2, 5),
-(2, 1, 'Ojota clásica azul', 20, 5);
+(2, 1, 'Ojota clasica azul', 20, 5);
 
 
 INSERT INTO venta (
@@ -62,6 +69,8 @@ INSERT INTO venta (
     cliente_id,
     numero_operacion,
     fecha,
+    subtotal,
+    descuento_total,
     total,
     metodo_pago,
     monto_recibido,
@@ -78,6 +87,8 @@ VALUES
     'V-202603-000001',
     current_timestamp,
     150000,
+    0,
+    150000,
     'EFECTIVO',
     150000,
     0,
@@ -91,6 +102,8 @@ VALUES
     2,
     'V-202603-000002',
     current_timestamp,
+    85000,
+    0,
     85000,
     'TRANSFERENCIA',
     NULL,
@@ -108,12 +121,14 @@ INSERT INTO venta_detalle (
     producto_nombre,
     cantidad,
     precio_unitario,
+    gross_subtotal,
+    discount_amount,
     subtotal,
     vat_type
 )
 VALUES
-(1, 1, 1, 'ZAP-001', 'Zapato deportivo negro', 1, 150000, 150000, 'IVA_10'),
-(2, 2, 2, 'OJT-001', 'Ojota clásica azul', 1, 85000, 85000, 'IVA_10');
+(1, 1, 1, 'ZAP-001', 'Zapato deportivo negro', 1, 150000, 150000, 0, 150000, 'IVA_10'),
+(2, 2, 2, 'OJT-001', 'Ojota clasica azul', 1, 85000, 85000, 0, 85000, 'IVA_10');
 
 SELECT setval(pg_get_serial_sequence('empresa', 'id'), COALESCE((SELECT MAX(id) FROM empresa), 1), true);
 SELECT setval(pg_get_serial_sequence('usuario', 'id'), COALESCE((SELECT MAX(id) FROM usuario), 1), true);
@@ -196,7 +211,7 @@ insert into pagare (
     300000,
     300000,
     'PENDIENTE',
-    'Pagaré demo',
+    'Pagare demo',
     1
 );
 
@@ -222,7 +237,7 @@ SELECT setval(pg_get_serial_sequence('venta_pago', 'id'), COALESCE((SELECT MAX(i
 
 INSERT INTO suscripcion_plan (
     code, name, description, price_monthly,
-    max_open_cash_sessions, max_users, max_branches,
+    max_open_cash_sessions, max_users, max_branches, max_monthly_purchases,
     allow_fiscal_printer, allow_electronic_invoice,
     allow_internal_ticket, allow_bancard_qr, active
 ) VALUES
@@ -231,7 +246,7 @@ INSERT INTO suscripcion_plan (
     'Básico',
     'Ticket interno sin valor fiscal. Ideal para negocio pequeño.',
     0,
-    1, 2, 1,
+    1, 2, 1, 30,
     FALSE, FALSE,
     TRUE, FALSE, TRUE
 ),
@@ -240,7 +255,7 @@ INSERT INTO suscripcion_plan (
     'Pro',
     'Incluye ticket interno y soporte para autoimpresor fiscal/legal.',
     0,
-    2, 5, 2,
+    2, 5, 2, 300,
     TRUE, FALSE,
     TRUE, TRUE, TRUE
 ),
@@ -249,7 +264,7 @@ INSERT INTO suscripcion_plan (
     'Premium',
     'Incluye ticket interno, autoimpresor y facturación electrónica.',
     0,
-    5, 20, 5,
+    5, 20, 5, NULL,
     TRUE, TRUE,
     TRUE, TRUE, TRUE
 );
@@ -267,5 +282,26 @@ FROM suscripcion_plan sp
 WHERE sp.code = 'PRO';
 
 
+INSERT INTO usuario (
+    empresa_id,
+    cedula,
+    nombre_completo,
+    password_hash,
+    quick_pin,
+    rol_codigo,
+    estado
+)
+SELECT
+    empresa_id,
+    '9999999',
+    'Cajero Demo',
+    password_hash,
+    '5678',
+    'CAJERO',
+    'ACTIVO'
+FROM usuario
+WHERE id = 1;
+select id, codigo, estado, licencia_estado, licencia_vencimiento
+from empresa;
 
 

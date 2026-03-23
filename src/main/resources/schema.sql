@@ -1,6 +1,11 @@
 DROP TABLE IF EXISTS venta_pago CASCADE;
 DROP TABLE IF EXISTS venta_detalle CASCADE;
 DROP TABLE IF EXISTS venta CASCADE;
+DROP TABLE IF EXISTS inventario_movimiento CASCADE;
+DROP TABLE IF EXISTS compra_pago CASCADE;
+DROP TABLE IF EXISTS compra_detalle CASCADE;
+DROP TABLE IF EXISTS compra CASCADE;
+DROP TABLE IF EXISTS proveedor CASCADE;
 DROP TABLE IF EXISTS configuracion_facturacion CASCADE;
 DROP TABLE IF EXISTS suscripcion_empresa CASCADE;
 DROP TABLE IF EXISTS suscripcion_plan CASCADE;
@@ -114,6 +119,25 @@ CREATE INDEX ix_cliente_empresa_documento
 CREATE INDEX ix_cliente_empresa_ruc
     ON cliente (empresa_id, ruc);
 
+CREATE TABLE proveedor (
+    id BIGSERIAL PRIMARY KEY,
+    empresa_id BIGINT NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    ruc VARCHAR(30),
+    phone VARCHAR(30),
+    email VARCHAR(150),
+    address VARCHAR(250),
+    observation VARCHAR(500),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_proveedor_empresa
+        FOREIGN KEY (empresa_id) REFERENCES empresa(id)
+);
+
+CREATE INDEX ix_proveedor_empresa_name
+    ON proveedor (empresa_id, name);
+
 CREATE TABLE stock (
     id BIGSERIAL PRIMARY KEY,
     empresa_id BIGINT NOT NULL,
@@ -124,26 +148,44 @@ CREATE TABLE stock (
         FOREIGN KEY (empresa_id) REFERENCES empresa(id)
 );
 
-CREATE TABLE venta (
-    id BIGSERIAL PRIMARY KEY,
-    empresa_id BIGINT NOT NULL,
-    cliente_id BIGINT NULL,
-    numero_operacion VARCHAR(30) NOT NULL,
-    fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    total NUMERIC(15,2) NOT NULL,
+  CREATE TABLE venta (
+      id BIGSERIAL PRIMARY KEY,
+      empresa_id BIGINT NOT NULL,
+      cliente_id BIGINT NULL,
+      numero_operacion VARCHAR(30) NOT NULL,
+      fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
+      descuento_total NUMERIC(15,2) NOT NULL DEFAULT 0,
+      total NUMERIC(15,2) NOT NULL,
     metodo_pago VARCHAR(30) NOT NULL,
     monto_recibido NUMERIC(15,2),
-    vuelto NUMERIC(15,2),
-    estado VARCHAR(20) NOT NULL,
-    observacion VARCHAR(500),
-    creado_por_usuario_id BIGINT NULL,
-    CONSTRAINT fk_venta_empresa
-        FOREIGN KEY (empresa_id) REFERENCES empresa(id),
-    CONSTRAINT fk_venta_cliente
-        FOREIGN KEY (cliente_id) REFERENCES cliente(id),
-    CONSTRAINT fk_venta_usuario
-        FOREIGN KEY (creado_por_usuario_id) REFERENCES usuario(id)
-);
+      vuelto NUMERIC(15,2),
+      estado VARCHAR(20) NOT NULL,
+      observacion VARCHAR(500),
+      creado_por_usuario_id BIGINT NULL,
+      motivo_anulacion VARCHAR(500),
+      fecha_anulacion TIMESTAMP NULL,
+      anulado_por_usuario_id BIGINT NULL,
+      motivo_devolucion VARCHAR(500),
+      fecha_devolucion TIMESTAMP NULL,
+      devuelto_por_usuario_id BIGINT NULL,
+      monto_devolucion NUMERIC(15,2) NOT NULL DEFAULT 0,
+      fiscal_document_type VARCHAR(30),
+      fiscal_invoice_number VARCHAR(50),
+      fiscal_timbrado_number VARCHAR(50),
+      fiscal_establishment_code VARCHAR(20),
+      fiscal_expedition_point VARCHAR(20),
+      CONSTRAINT fk_venta_empresa
+          FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+      CONSTRAINT fk_venta_cliente
+          FOREIGN KEY (cliente_id) REFERENCES cliente(id),
+      CONSTRAINT fk_venta_usuario
+          FOREIGN KEY (creado_por_usuario_id) REFERENCES usuario(id),
+      CONSTRAINT fk_venta_usuario_anulacion
+          FOREIGN KEY (anulado_por_usuario_id) REFERENCES usuario(id),
+      CONSTRAINT fk_venta_usuario_devolucion
+          FOREIGN KEY (devuelto_por_usuario_id) REFERENCES usuario(id)
+  );
 
 CREATE UNIQUE INDEX uq_venta_empresa_numero_operacion
     ON venta (empresa_id, numero_operacion);
@@ -153,10 +195,14 @@ CREATE TABLE venta_detalle (
     venta_id BIGINT NOT NULL,
     producto_id BIGINT NOT NULL,
     producto_codigo VARCHAR(50) NOT NULL,
-    producto_nombre VARCHAR(150) NOT NULL,
-    cantidad NUMERIC(15,2) NOT NULL,
-    precio_unitario NUMERIC(15,2) NOT NULL,
-    subtotal NUMERIC(15,2) NOT NULL,
+      producto_nombre VARCHAR(150) NOT NULL,
+      cantidad NUMERIC(15,2) NOT NULL,
+      precio_unitario NUMERIC(15,2) NOT NULL,
+      gross_subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
+      discount_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+      returned_quantity NUMERIC(15,2) NOT NULL DEFAULT 0,
+      returned_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+      subtotal NUMERIC(15,2) NOT NULL,
     vat_type VARCHAR(10) NOT NULL DEFAULT 'IVA_10',
     CONSTRAINT fk_venta_detalle_venta
         FOREIGN KEY (venta_id) REFERENCES venta(id),
@@ -172,6 +218,7 @@ create table if not exists presupuesto (
     id bigserial primary key,
     empresa_id bigint not null,
     cliente_id bigint null,
+    venta_id bigint null,
     numero_presupuesto varchar(30) not null,
     fecha timestamp not null default current_timestamp,
     vigencia_hasta date null,
@@ -183,6 +230,8 @@ create table if not exists presupuesto (
         foreign key (empresa_id) references empresa(id),
     constraint fk_presupuesto_cliente
         foreign key (cliente_id) references cliente(id),
+    constraint fk_presupuesto_venta
+        foreign key (venta_id) references venta(id),
     constraint fk_presupuesto_usuario
         foreign key (creado_por_usuario_id) references usuario(id)
 );
@@ -203,6 +252,90 @@ create table if not exists presupuesto_detalle (
         foreign key (presupuesto_id) references presupuesto(id),
     constraint fk_presupuesto_detalle_producto
         foreign key (producto_id) references producto(id)
+);
+
+create table if not exists inventario_movimiento (
+    id bigserial primary key,
+    empresa_id bigint not null,
+    producto_id bigint not null,
+    usuario_id bigint not null,
+    movement_type varchar(20) not null,
+    quantity numeric(15,2) not null,
+    previous_stock numeric(15,2) not null,
+    new_stock numeric(15,2) not null,
+    reason varchar(500) not null,
+    created_at timestamp not null default current_timestamp,
+    constraint fk_inventario_movimiento_empresa
+        foreign key (empresa_id) references empresa(id),
+    constraint fk_inventario_movimiento_producto
+        foreign key (producto_id) references producto(id),
+    constraint fk_inventario_movimiento_usuario
+        foreign key (usuario_id) references usuario(id)
+);
+
+create index if not exists idx_inventario_movimiento_empresa_fecha
+    on inventario_movimiento (empresa_id, created_at desc);
+
+create table if not exists compra (
+    id bigserial primary key,
+    empresa_id bigint not null,
+    proveedor_id bigint not null,
+    creado_por_usuario_id bigint not null,
+    anulado_por_usuario_id bigint null,
+    invoice_number varchar(50) not null,
+    purchase_date date not null,
+    due_date date null,
+    subtotal numeric(15,2) not null default 0,
+    total numeric(15,2) not null default 0,
+    paid_amount numeric(15,2) not null default 0,
+    balance numeric(15,2) not null default 0,
+    status varchar(20) not null,
+    purchase_type varchar(20) not null,
+    receipt_status varchar(20) not null,
+    payment_condition varchar(20) not null,
+    observation varchar(500),
+    cancel_reason varchar(500),
+    canceled_at timestamp null,
+    created_at timestamp not null default current_timestamp,
+    constraint fk_compra_empresa
+        foreign key (empresa_id) references empresa(id),
+    constraint fk_compra_proveedor
+        foreign key (proveedor_id) references proveedor(id),
+    constraint fk_compra_usuario
+        foreign key (creado_por_usuario_id) references usuario(id),
+    constraint fk_compra_usuario_anulacion
+        foreign key (anulado_por_usuario_id) references usuario(id)
+);
+
+create table if not exists compra_detalle (
+    id bigserial primary key,
+    compra_id bigint not null,
+    producto_id bigint not null,
+    product_code varchar(50) not null,
+    product_name varchar(150) not null,
+    quantity numeric(15,2) not null,
+    cost_price numeric(15,2) not null,
+    received_quantity numeric(15,2) not null default 0,
+    subtotal numeric(15,2) not null,
+    constraint fk_compra_detalle_compra
+        foreign key (compra_id) references compra(id),
+    constraint fk_compra_detalle_producto
+        foreign key (producto_id) references producto(id)
+);
+
+create table if not exists compra_pago (
+    id bigserial primary key,
+    compra_id bigint not null,
+    usuario_id bigint not null,
+    amount numeric(15,2) not null,
+    method varchar(30) not null,
+    reference varchar(100),
+    observation varchar(500),
+    created_at timestamp not null default current_timestamp,
+    constraint fk_compra_pago_compra
+        foreign key (compra_id) references compra(id),
+    constraint fk_compra_pago_usuario
+        foreign key (usuario_id) references usuario(id)
 );
 
 create table if not exists pagare (
@@ -322,6 +455,7 @@ CREATE TABLE suscripcion_plan (
     max_open_cash_sessions INT NOT NULL DEFAULT 1,
     max_users INT,
     max_branches INT,
+    max_monthly_purchases INT,
     allow_fiscal_printer BOOLEAN NOT NULL DEFAULT FALSE,
     allow_electronic_invoice BOOLEAN NOT NULL DEFAULT FALSE,
     allow_internal_ticket BOOLEAN NOT NULL DEFAULT TRUE,

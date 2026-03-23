@@ -27,7 +27,7 @@ public class SubscriptionAccessService {
 		SubscriptionPlan plan = getActivePlan(companyId);
 
 		return new SubscriptionFeatureResponse(plan.getCode(), plan.getName(), plan.getMaxOpenCashSessions(),
-				plan.getMaxUsers(), plan.getMaxBranches(), plan.isAllowInternalTicket(), plan.isAllowFiscalPrinter(),
+				plan.getMaxUsers(), plan.getMaxBranches(), plan.getMaxMonthlyPurchases(), plan.isAllowInternalTicket(), plan.isAllowFiscalPrinter(),
 				plan.isAllowElectronicInvoice(), plan.isAllowBancardQr());
 	}
 
@@ -43,6 +43,7 @@ public class SubscriptionAccessService {
 	                    plan.getMaxOpenCashSessions(),
 	                    plan.getMaxUsers(),
 	                    plan.getMaxBranches(),
+	                    plan.getMaxMonthlyPurchases(),
 	                    plan.isAllowInternalTicket(),
 	                    plan.isAllowFiscalPrinter(),
 	                    plan.isAllowElectronicInvoice(),
@@ -92,6 +93,16 @@ public class SubscriptionAccessService {
 		SubscriptionPlan plan = getActivePlan(companyId);
 		if (!plan.isAllowInternalTicket()) {
 			throw new IllegalArgumentException("Su plan no incluye ticket interno.");
+		}
+	}
+
+	@Transactional(readOnly = true)
+	public void validateCanRegisterPurchase(Long companyId, long currentMonthCount) {
+		SubscriptionPlan plan = getActivePlan(companyId);
+		Integer maxAllowed = plan.getMaxMonthlyPurchases();
+
+		if (maxAllowed != null && currentMonthCount >= maxAllowed) {
+			throw new IllegalArgumentException("Su plan alcanzo el limite mensual de compras registradas.");
 		}
 	}
 }

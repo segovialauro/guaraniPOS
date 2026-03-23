@@ -1,0 +1,1 @@
+Con esto ya te queda una base muy buena y administrable del módulo POS. El siguiente paso más fino, si querés, sería que esos topes no sean solo por rol sino también por sucursal o por plan contratado.

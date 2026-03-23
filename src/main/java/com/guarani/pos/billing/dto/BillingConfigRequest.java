@@ -20,10 +20,12 @@ public record BillingConfigRequest(
 
         @NotBlank
         @Size(max = 20)
+        @Pattern(regexp = "^\\d{3}$", message = "El establecimiento debe tener 3 digitos.")
         String establishmentCode,
 
         @NotBlank
         @Size(max = 20)
+        @Pattern(regexp = "^\\d{3}$", message = "El punto de expedicion debe tener 3 digitos.")
         String expeditionPoint,
 
         @Size(max = 500)
@@ -57,6 +59,7 @@ public record BillingConfigRequest(
 
         @NotBlank
         @Size(max = 50)
+        @Pattern(regexp = "^\\d{7,}$", message = "El timbrado debe contener solo digitos.")
         String timbradoNumber,
 
         @NotBlank
@@ -66,6 +69,10 @@ public record BillingConfigRequest(
 
         @NotBlank
         @Size(max = 50)
+        @Pattern(
+                regexp = "^\\d{3}-\\d{3}-\\d{7}$",
+                message = "El proximo numero debe tener formato 001-001-0000001."
+        )
         String invoiceNumber,
 
         String logoDataUrl,

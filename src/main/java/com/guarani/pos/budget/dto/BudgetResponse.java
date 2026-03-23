@@ -14,6 +14,7 @@ public record BudgetResponse(
         String customerName,
         String status,
         String observation,
+        Long saleId,
         BigDecimal total,
         List<BudgetDetailResponse> items
 ) {

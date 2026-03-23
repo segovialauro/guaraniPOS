@@ -3,6 +3,7 @@ package com.guarani.pos.budget.model;
 import com.guarani.pos.auth.model.User;
 import com.guarani.pos.company.model.Company;
 import com.guarani.pos.customer.model.Customer;
+import com.guarani.pos.sale.model.Sale;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -49,6 +50,10 @@ public class Budget {
     @JoinColumn(name = "creado_por_usuario_id")
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venta_id")
+    private Sale convertedSale;
+
     @OneToMany(mappedBy = "budget", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BudgetDetail> details = new ArrayList<>();
 
@@ -76,5 +81,7 @@ public class Budget {
     public void setObservacion(String observacion) { this.observacion = observacion; }
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+    public Sale getConvertedSale() { return convertedSale; }
+    public void setConvertedSale(Sale convertedSale) { this.convertedSale = convertedSale; }
     public List<BudgetDetail> getDetails() { return details; }
 }

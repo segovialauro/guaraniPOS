@@ -38,4 +38,20 @@ public final class SecurityUtils {
 
 		throw new IllegalStateException("No se pudo obtener userId del token");
 	}
+
+	public static String getCurrentRole() {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+		if (authentication == null) {
+			throw new IllegalStateException("No hay autenticacion");
+		}
+
+		Object details = authentication.getDetails();
+
+		if (details instanceof JwtUserDetails jwtUserDetails) {
+			return jwtUserDetails.role();
+		}
+
+		throw new IllegalStateException("No se pudo obtener el rol del token");
+	}
 }

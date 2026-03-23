@@ -33,6 +33,18 @@ public class SaleDetail {
     @Column(name = "precio_unitario", nullable = false, precision = 15, scale = 2)
     private BigDecimal precioUnitario;
 
+    @Column(name = "gross_subtotal", nullable = false, precision = 15, scale = 2)
+    private BigDecimal grossSubtotal;
+
+    @Column(name = "discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "returned_quantity", nullable = false, precision = 15, scale = 2)
+    private BigDecimal returnedQuantity = BigDecimal.ZERO;
+
+    @Column(name = "returned_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal returnedAmount = BigDecimal.ZERO;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
 
@@ -52,6 +64,14 @@ public class SaleDetail {
     public void setCantidad(BigDecimal cantidad) { this.cantidad = cantidad; }
     public BigDecimal getPrecioUnitario() { return precioUnitario; }
     public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
+    public BigDecimal getGrossSubtotal() { return grossSubtotal; }
+    public void setGrossSubtotal(BigDecimal grossSubtotal) { this.grossSubtotal = grossSubtotal; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public BigDecimal getReturnedQuantity() { return returnedQuantity; }
+    public void setReturnedQuantity(BigDecimal returnedQuantity) { this.returnedQuantity = returnedQuantity; }
+    public BigDecimal getReturnedAmount() { return returnedAmount; }
+    public void setReturnedAmount(BigDecimal returnedAmount) { this.returnedAmount = returnedAmount; }
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
     public String getVatType() { return vatType; }

@@ -19,6 +19,7 @@ public record CashSessionResponse(
         BigDecimal expectedCash,
         BigDecimal cashCounted,
         BigDecimal difference,
+        String reconciliationStatus,
         String status,
         String observation
 ) {

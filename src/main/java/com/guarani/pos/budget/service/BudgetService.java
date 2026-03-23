@@ -23,9 +23,13 @@ import com.guarani.pos.customer.model.Customer;
 import com.guarani.pos.customer.repository.CustomerRepository;
 import com.guarani.pos.product.model.Product;
 import com.guarani.pos.product.repository.ProductRepository;
+import com.guarani.pos.sale.dto.SaleCreateRequest;
+import com.guarani.pos.sale.dto.SaleItemRequest;
+import com.guarani.pos.sale.dto.SalePaymentRequest;
+import com.guarani.pos.sale.dto.SaleResponse;
 import com.guarani.pos.sale.model.Sale;
-import com.guarani.pos.sale.model.SaleDetail;
 import com.guarani.pos.sale.repository.SaleRepository;
+import com.guarani.pos.sale.service.SaleService;
 
 @Service
 public class BudgetService {
@@ -35,6 +39,7 @@ public class BudgetService {
     private final CustomerRepository customerRepository;
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final SaleService saleService;
     private final SaleRepository saleRepository;
 
     public BudgetService(BudgetRepository budgetRepository,
@@ -42,12 +47,14 @@ public class BudgetService {
                          CustomerRepository customerRepository,
                          CompanyRepository companyRepository,
                          UserRepository userRepository,
+                         SaleService saleService,
                          SaleRepository saleRepository) {
         this.budgetRepository = budgetRepository;
         this.productRepository = productRepository;
         this.customerRepository = customerRepository;
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
+        this.saleService = saleService;
         this.saleRepository = saleRepository;
     }
 
@@ -128,6 +135,7 @@ public class BudgetService {
                 budget.getCustomer() != null ? budget.getCustomer().getNombre() : null,
                 budget.getEstado(),
                 budget.getObservacion(),
+                budget.getConvertedSale() != null ? budget.getConvertedSale().getId() : null,
                 budget.getTotal(),
                 budget.getDetails().stream()
                         .map(d -> new BudgetDetailResponse(
@@ -168,56 +176,31 @@ public class BudgetService {
             throw new IllegalArgumentException("Solo se pueden convertir presupuestos pendientes o aprobados.");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+        SaleCreateRequest saleRequest = new SaleCreateRequest(
+                budget.getCustomer() != null ? budget.getCustomer().getId() : null,
+                "EFECTIVO",
+                budget.getTotal(),
+                BigDecimal.ZERO,
+                "Generada desde presupuesto " + budget.getNumeroPresupuesto(),
+                List.of(new SalePaymentRequest("EFECTIVO", budget.getTotal(), "Presupuesto " + budget.getNumeroPresupuesto())),
+                budget.getDetails().stream()
+                        .map(detail -> new SaleItemRequest(
+                                detail.getProduct().getId(),
+                                detail.getCantidad(),
+                                BigDecimal.ZERO
+                        ))
+                        .toList()
+        );
 
-        Sale sale = new Sale();
-        sale.setCompany(budget.getCompany());
-        sale.setCustomer(budget.getCustomer());
-        sale.setCreatedBy(user);
-        sale.setMetodoPago("EFECTIVO");
-        sale.setEstado("CONFIRMADA");
-        sale.setObservacion("Generada desde presupuesto " + budget.getNumeroPresupuesto());
-        sale.setNumeroOperacion(generateSaleNumber(companyId));
-
-        for (var budgetDetail : budget.getDetails()) {
-            Product product = budgetDetail.getProduct();
-
-            if (!product.isActivo()) {
-                throw new IllegalArgumentException("Producto inactivo: " + product.getNombre());
-            }
-
-            if (product.getStockActual().compareTo(budgetDetail.getCantidad()) < 0) {
-                throw new IllegalArgumentException("Stock insuficiente para: " + product.getNombre());
-            }
-
-            SaleDetail detail = new SaleDetail();
-            detail.setProduct(product);
-            detail.setProductoCodigo(budgetDetail.getProductoCodigo());
-            detail.setProductoNombre(budgetDetail.getProductoNombre());
-            detail.setCantidad(budgetDetail.getCantidad());
-            detail.setPrecioUnitario(budgetDetail.getPrecioUnitario());
-            detail.setSubtotal(budgetDetail.getSubtotal());
-
-            sale.addDetail(detail);
-
-            product.setStockActual(product.getStockActual().subtract(budgetDetail.getCantidad()));
-        }
-
-        sale.setTotal(budget.getTotal());
-
-        Sale savedSale = saleRepository.save(sale);
+        SaleResponse savedSale = saleService.create(companyId, userId, saleRequest);
+        Sale convertedSale = saleRepository.findById(savedSale.id())
+                .orElseThrow(() -> new IllegalArgumentException("Venta convertida no encontrada."));
 
         budget.setEstado("CONVERTIDO");
+        budget.setConvertedSale(convertedSale);
         budgetRepository.save(budget);
 
-        return savedSale.getId();
-    }
-    
-    private String generateSaleNumber(Long companyId) {
-        long next = saleRepository.countByCompanyId(companyId) + 1;
-        String period = YearMonth.now().toString().replace("-", "");
-        return "V-" + period + "-" + new DecimalFormat("000000").format(next);
+        return savedSale.id();
     }
 
 

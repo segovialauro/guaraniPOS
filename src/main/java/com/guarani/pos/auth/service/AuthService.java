@@ -34,14 +34,18 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        Company company = resolveAndValidateCompany(request.tenantCode());
-        User user = userRepository.findByCompanyIdAndCedula(company.getId(), request.cedula())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario o contraseña inválidos."));
+        String tenantCode = normalizeRequired(request.tenantCode(), "El codigo de empresa es obligatorio.");
+        String cedula = normalizeRequired(request.cedula(), "La cedula es obligatoria.");
+        String password = normalizeRequired(request.password(), "La contrasena es obligatoria.");
+
+        Company company = resolveAndValidateCompany(tenantCode);
+        User user = userRepository.findByCompanyIdAndCedula(company.getId(), cedula)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario o contrasena invalidos."));
 
         validateActiveUser(user);
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Usuario o contraseña inválidos.");
+        if (!matchesPassword(password, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Usuario o contrasena invalidos.");
         }
 
         return buildResponse(user);
@@ -49,9 +53,12 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse quickPin(QuickPinRequest request) {
-        Company company = resolveAndValidateCompany(request.tenantCode());
-        User user = userRepository.findByCompanyIdAndQuickPin(company.getId(), request.pin())
-                .orElseThrow(() -> new IllegalArgumentException("PIN inválido."));
+        String tenantCode = normalizeRequired(request.tenantCode(), "El codigo de empresa es obligatorio.");
+        String pin = normalizeRequired(request.pin(), "El PIN es obligatorio.");
+
+        Company company = resolveAndValidateCompany(tenantCode);
+        User user = userRepository.findByCompanyIdAndQuickPin(company.getId(), pin)
+                .orElseThrow(() -> new IllegalArgumentException("PIN invalido."));
 
         validateActiveUser(user);
         return buildResponse(user);
@@ -59,18 +66,18 @@ public class AuthService {
 
     private Company resolveAndValidateCompany(String tenantCode) {
         Company company = companyRepository.findByCodeIgnoreCase(tenantCode)
-                .orElseThrow(() -> new IllegalArgumentException("Empresa o licencia no válida."));
+                .orElseThrow(() -> new IllegalArgumentException("Empresa o licencia no valida."));
 
         if (!"ACTIVA".equalsIgnoreCase(company.getStatus())) {
             throw new IllegalArgumentException("La empresa se encuentra suspendida o inactiva.");
         }
 
         if (!"ACTIVA".equalsIgnoreCase(company.getLicenseStatus())) {
-            throw new IllegalArgumentException("La licencia no está activa.");
+            throw new IllegalArgumentException("La licencia no esta activa.");
         }
 
         if (company.getLicenseDueDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("La licencia está vencida.");
+            throw new IllegalArgumentException("La licencia esta vencida.");
         }
 
         return company;
@@ -78,7 +85,7 @@ public class AuthService {
 
     private void validateActiveUser(User user) {
         if (!"ACTIVO".equalsIgnoreCase(user.getStatus())) {
-            throw new IllegalArgumentException("El usuario está inactivo.");
+            throw new IllegalArgumentException("El usuario esta inactivo.");
         }
     }
 
@@ -91,5 +98,20 @@ public class AuthService {
                 user.getFullName(),
                 user.getRoleCode()
         );
+    }
+
+    private String normalizeRequired(String value, String message) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(message);
+        }
+        return value.trim();
+    }
+
+    private boolean matchesPassword(String rawPassword, String encodedPassword) {
+        try {
+            return passwordEncoder.matches(rawPassword, encodedPassword);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 }

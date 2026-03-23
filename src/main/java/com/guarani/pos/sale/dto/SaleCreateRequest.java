@@ -12,6 +12,7 @@ public record SaleCreateRequest(
         Long customerId,
         @NotBlank String paymentMethod,
         @DecimalMin(value = "0.00", inclusive = true) BigDecimal amountReceived,
+        @DecimalMin(value = "0.00", inclusive = true) BigDecimal globalDiscountAmount,
         String observation,
         @Valid List<SalePaymentRequest> payments,
         @Valid @NotEmpty List<SaleItemRequest> items
