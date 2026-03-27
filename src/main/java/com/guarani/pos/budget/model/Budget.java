@@ -40,6 +40,15 @@ public class Budget {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal total;
 
+    @Column(name = "subtotal_before_discounts", nullable = false, precision = 15, scale = 2)
+    private BigDecimal subtotalBeforeDiscounts = BigDecimal.ZERO;
+
+    @Column(name = "discount_total", nullable = false, precision = 15, scale = 2)
+    private BigDecimal discountTotal = BigDecimal.ZERO;
+
+    @Column(name = "global_discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal globalDiscountAmount = BigDecimal.ZERO;
+
     @Column(nullable = false, length = 20)
     private String estado;
 
@@ -75,6 +84,12 @@ public class Budget {
     public void setVigenciaHasta(LocalDate vigenciaHasta) { this.vigenciaHasta = vigenciaHasta; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
+    public BigDecimal getSubtotalBeforeDiscounts() { return subtotalBeforeDiscounts; }
+    public void setSubtotalBeforeDiscounts(BigDecimal subtotalBeforeDiscounts) { this.subtotalBeforeDiscounts = subtotalBeforeDiscounts; }
+    public BigDecimal getDiscountTotal() { return discountTotal; }
+    public void setDiscountTotal(BigDecimal discountTotal) { this.discountTotal = discountTotal; }
+    public BigDecimal getGlobalDiscountAmount() { return globalDiscountAmount; }
+    public void setGlobalDiscountAmount(BigDecimal globalDiscountAmount) { this.globalDiscountAmount = globalDiscountAmount; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
     public String getObservacion() { return observacion; }

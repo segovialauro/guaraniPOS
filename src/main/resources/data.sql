@@ -16,7 +16,8 @@ VALUES (
 
 INSERT INTO parametro_general (group_code, code, label, description, sort_order, active, system_defined)
 VALUES
-('PRODUCT_CATEGORY', 'Calzados', 'Calzados', 'Categoria para calzados y zapatillas.', 10, TRUE, TRUE),
+('PRODUCT_CATEGORY', 'Calzados', 'Calzados', 'ng serve
+Categoria para calzados y zapatillas.', 10, TRUE, TRUE),
 ('PRODUCT_CATEGORY', 'Accesorios', 'Accesorios', 'Categoria para medias, cinturones y complementos.', 20, TRUE, TRUE),
 ('PRODUCT_CATEGORY', 'Liquidos', 'Liquidos', 'Categoria para bebidas y combustibles.', 30, TRUE, TRUE),
 ('UNIT_MEASURE', 'UNIDAD', 'Unidad', 'Unidad individual.', 10, TRUE, TRUE),
@@ -243,26 +244,26 @@ INSERT INTO suscripcion_plan (
 ) VALUES
 (
     'BASIC',
-    'Básico',
-    'Ticket interno sin valor fiscal. Ideal para negocio pequeño.',
+    'Basico',
+    'Sistema completo para una caja y una sucursal.',
     0,
-    1, 2, 1, 30,
-    FALSE, FALSE,
-    TRUE, FALSE, TRUE
+    1, 2, 1, NULL,
+    TRUE, FALSE,
+    TRUE, TRUE, TRUE
 ),
 (
     'PRO',
     'Pro',
-    'Incluye ticket interno y soporte para autoimpresor fiscal/legal.',
+    'Sistema completo con mayor capacidad operativa para crecer.',
     0,
-    2, 5, 2, 300,
+    2, 5, 2, NULL,
     TRUE, FALSE,
     TRUE, TRUE, TRUE
 ),
 (
     'PREMIUM',
     'Premium',
-    'Incluye ticket interno, autoimpresor y facturación electrónica.',
+    'Sistema completo con mayor escala y factura electronica.',
     0,
     5, 20, 5, NULL,
     TRUE, TRUE,
@@ -303,5 +304,6 @@ FROM usuario
 WHERE id = 1;
 select id, codigo, estado, licencia_estado, licencia_vencimiento
 from empresa;
+
 
 

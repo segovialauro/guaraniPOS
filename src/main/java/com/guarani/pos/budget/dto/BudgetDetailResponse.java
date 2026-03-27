@@ -8,6 +8,8 @@ public record BudgetDetailResponse(
         String productName,
         BigDecimal quantity,
         BigDecimal unitPrice,
+        BigDecimal grossSubtotal,
+        BigDecimal discountAmount,
         BigDecimal subtotal
 ) {
 }

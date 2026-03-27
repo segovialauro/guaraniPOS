@@ -10,6 +10,8 @@ public record ProductResponse(
         String categoria,
         BigDecimal precioCosto,
         BigDecimal precioVenta,
+        BigDecimal precioVentaMayorista,
+        BigDecimal cantidadMayoristaMinima,
         BigDecimal stockActual,
         BigDecimal stockMinimo,
         String unidadMedida,

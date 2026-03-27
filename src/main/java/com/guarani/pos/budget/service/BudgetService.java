@@ -2,6 +2,7 @@ package com.guarani.pos.budget.service;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -89,7 +90,8 @@ public class BudgetService {
         budget.setVigenciaHasta(request.validUntil());
         budget.setNumeroPresupuesto(generateBudgetNumber(companyId));
 
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal subtotalBeforeDiscounts = BigDecimal.ZERO;
+        BigDecimal lineDiscountTotal = BigDecimal.ZERO;
 
         for (BudgetItemRequest item : request.items()) {
             Product product = productRepository.findByIdAndCompanyId(item.productId(), companyId)
@@ -99,20 +101,37 @@ public class BudgetService {
                 throw new IllegalArgumentException("El producto está inactivo: " + product.getNombre());
             }
 
-            BigDecimal subtotal = product.getPrecioVenta().multiply(item.quantity());
+            BigDecimal unitPrice = resolveBudgetUnitPrice(product, item.quantity());
+            BigDecimal grossSubtotal = unitPrice.multiply(item.quantity());
+            BigDecimal lineDiscount = sanitizeDiscountAmount(item.discountAmount(), grossSubtotal);
+            BigDecimal subtotal = grossSubtotal.subtract(lineDiscount);
 
             BudgetDetail detail = new BudgetDetail();
             detail.setProduct(product);
             detail.setProductoCodigo(product.getCodigo());
             detail.setProductoNombre(product.getNombre());
             detail.setCantidad(item.quantity());
-            detail.setPrecioUnitario(product.getPrecioVenta());
+            detail.setPrecioUnitario(unitPrice);
+            detail.setGrossSubtotal(grossSubtotal);
+            detail.setDiscountAmount(lineDiscount);
             detail.setSubtotal(subtotal);
 
             budget.addDetail(detail);
-            total = total.add(subtotal);
+            subtotalBeforeDiscounts = subtotalBeforeDiscounts.add(grossSubtotal);
+            lineDiscountTotal = lineDiscountTotal.add(lineDiscount);
         }
 
+        BigDecimal globalDiscountAmount = sanitizeDiscountAmount(
+                request.globalDiscountAmount(),
+                subtotalBeforeDiscounts.subtract(lineDiscountTotal)
+        );
+        BigDecimal total = subtotalBeforeDiscounts
+                .subtract(lineDiscountTotal)
+                .subtract(globalDiscountAmount);
+
+        budget.setSubtotalBeforeDiscounts(subtotalBeforeDiscounts);
+        budget.setGlobalDiscountAmount(globalDiscountAmount);
+        budget.setDiscountTotal(lineDiscountTotal.add(globalDiscountAmount));
         budget.setTotal(total);
 
         Budget saved = budgetRepository.save(budget);
@@ -136,6 +155,9 @@ public class BudgetService {
                 budget.getEstado(),
                 budget.getObservacion(),
                 budget.getConvertedSale() != null ? budget.getConvertedSale().getId() : null,
+                budget.getSubtotalBeforeDiscounts(),
+                budget.getDiscountTotal(),
+                budget.getGlobalDiscountAmount(),
                 budget.getTotal(),
                 budget.getDetails().stream()
                         .map(d -> new BudgetDetailResponse(
@@ -144,6 +166,8 @@ public class BudgetService {
                                 d.getProductoNombre(),
                                 d.getCantidad(),
                                 d.getPrecioUnitario(),
+                                d.getGrossSubtotal(),
+                                d.getDiscountAmount(),
                                 d.getSubtotal()
                         ))
                         .toList()
@@ -155,7 +179,7 @@ public class BudgetService {
         Budget budget = budgetRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Presupuesto no encontrado."));
 
-        if (!List.of("PENDIENTE", "APROBADO", "RECHAZADO").contains(status)) {
+        if (!List.of("PENDIENTE", "ENVIADO", "APROBADO", "RECHAZADO").contains(status)) {
             throw new IllegalArgumentException("Estado no permitido.");
         }
 
@@ -172,22 +196,26 @@ public class BudgetService {
         Budget budget = budgetRepository.findByIdAndCompanyId(budgetId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Presupuesto no encontrado."));
 
-        if (!List.of("PENDIENTE", "APROBADO").contains(budget.getEstado())) {
-            throw new IllegalArgumentException("Solo se pueden convertir presupuestos pendientes o aprobados.");
+        if (!List.of("PENDIENTE", "ENVIADO", "APROBADO").contains(budget.getEstado())) {
+            throw new IllegalArgumentException("Solo se pueden convertir presupuestos pendientes, enviados o aprobados.");
+        }
+
+        if (budget.getVigenciaHasta() != null && budget.getVigenciaHasta().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("El presupuesto ya vencio y no puede convertirse en venta.");
         }
 
         SaleCreateRequest saleRequest = new SaleCreateRequest(
                 budget.getCustomer() != null ? budget.getCustomer().getId() : null,
                 "EFECTIVO",
                 budget.getTotal(),
-                BigDecimal.ZERO,
+                budget.getGlobalDiscountAmount(),
                 "Generada desde presupuesto " + budget.getNumeroPresupuesto(),
                 List.of(new SalePaymentRequest("EFECTIVO", budget.getTotal(), "Presupuesto " + budget.getNumeroPresupuesto())),
                 budget.getDetails().stream()
                         .map(detail -> new SaleItemRequest(
                                 detail.getProduct().getId(),
                                 detail.getCantidad(),
-                                BigDecimal.ZERO
+                                detail.getDiscountAmount()
                         ))
                         .toList()
         );
@@ -201,6 +229,28 @@ public class BudgetService {
         budgetRepository.save(budget);
 
         return savedSale.id();
+    }
+
+    private BigDecimal resolveBudgetUnitPrice(Product product, BigDecimal quantity) {
+        if (product.getPrecioVentaMayorista() != null
+                && product.getCantidadMayoristaMinima() != null
+                && quantity.compareTo(product.getCantidadMayoristaMinima()) >= 0) {
+            return product.getPrecioVentaMayorista();
+        }
+
+        return product.getPrecioVenta();
+    }
+
+    private BigDecimal sanitizeDiscountAmount(BigDecimal discountAmount, BigDecimal maxAllowed) {
+        if (discountAmount == null || discountAmount.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO;
+        }
+
+        if (discountAmount.compareTo(maxAllowed) > 0) {
+            return maxAllowed;
+        }
+
+        return discountAmount;
     }
 
 

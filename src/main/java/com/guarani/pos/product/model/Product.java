@@ -36,6 +36,12 @@ public class Product {
 	@Column(name = "precio_venta", nullable = false, precision = 15, scale = 2)
 	private BigDecimal precioVenta;
 
+	@Column(name = "precio_venta_mayorista", precision = 15, scale = 2)
+	private BigDecimal precioVentaMayorista;
+
+	@Column(name = "cantidad_mayorista_minima", precision = 15, scale = 2)
+	private BigDecimal cantidadMayoristaMinima;
+
 	@Column(name = "stock_actual", nullable = false, precision = 15, scale = 2)
 	private BigDecimal stockActual = BigDecimal.ZERO;
 
@@ -135,6 +141,22 @@ public class Product {
 
 	public void setPrecioVenta(BigDecimal precioVenta) {
 		this.precioVenta = precioVenta;
+	}
+
+	public BigDecimal getPrecioVentaMayorista() {
+		return precioVentaMayorista;
+	}
+
+	public void setPrecioVentaMayorista(BigDecimal precioVentaMayorista) {
+		this.precioVentaMayorista = precioVentaMayorista;
+	}
+
+	public BigDecimal getCantidadMayoristaMinima() {
+		return cantidadMayoristaMinima;
+	}
+
+	public void setCantidadMayoristaMinima(BigDecimal cantidadMayoristaMinima) {
+		this.cantidadMayoristaMinima = cantidadMayoristaMinima;
 	}
 
 	public BigDecimal getStockActual() {

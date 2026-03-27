@@ -25,6 +25,20 @@ public class PagareController {
         return pagareService.findRecent(SecurityUtils.getCurrentCompanyId());
     }
 
+    @GetMapping("/auditoria")
+    public List<PagareResponse> findAuditHistory(@RequestParam(required = false) String from,
+                                                 @RequestParam(required = false) String to,
+                                                 @RequestParam(required = false) String status,
+                                                 @RequestParam(required = false) String q) {
+        return pagareService.findAuditHistory(
+                SecurityUtils.getCurrentCompanyId(),
+                from,
+                to,
+                status,
+                q
+        );
+    }
+
     @PostMapping
     public PagareResponse create(@Valid @RequestBody PagareCreateRequest request) {
         return pagareService.create(
@@ -36,6 +50,11 @@ public class PagareController {
 
     @PostMapping("/{id}/payments")
     public PagareResponse registerPayment(@PathVariable Long id, @Valid @RequestBody PagarePaymentRequest request) {
-        return pagareService.registerPayment(SecurityUtils.getCurrentCompanyId(), id, request);
+        return pagareService.registerPayment(
+                SecurityUtils.getCurrentCompanyId(),
+                SecurityUtils.getCurrentUserId(),
+                id,
+                request
+        );
     }
 }

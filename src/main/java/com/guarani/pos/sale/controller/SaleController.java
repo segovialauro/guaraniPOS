@@ -4,6 +4,7 @@ import com.guarani.pos.sale.dto.SaleCreateRequest;
 import com.guarani.pos.sale.dto.SaleCancelRequest;
 import com.guarani.pos.sale.dto.SaleReturnRequest;
 import com.guarani.pos.sale.dto.SaleResponse;
+import com.guarani.pos.sale.dto.SalesReportResponse;
 import com.guarani.pos.sale.dto.SalesOperationalSummaryResponse;
 import com.guarani.pos.sale.service.SaleService;
 import com.guarani.pos.security.SecurityUtils;
@@ -43,6 +44,13 @@ public class SaleController {
 	@GetMapping("/cierre-operativo")
 	public SalesOperationalSummaryResponse operationalSummary(@RequestParam(required = false) String date) {
 		return saleService.getOperationalSummary(SecurityUtils.getCurrentCompanyId(), date);
+	}
+
+	@GetMapping("/reportes")
+	public SalesReportResponse reports(
+			@RequestParam(required = false) String from,
+			@RequestParam(required = false) String to) {
+		return saleService.getReports(SecurityUtils.getCurrentCompanyId(), SecurityUtils.getCurrentUserId(), from, to);
 	}
 
 	@PostMapping

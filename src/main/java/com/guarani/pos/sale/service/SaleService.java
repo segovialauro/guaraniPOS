@@ -16,8 +16,11 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,8 +53,13 @@ import com.guarani.pos.sale.dto.SaleResponse;
 import com.guarani.pos.sale.dto.SaleTicketDetailResponse;
 import com.guarani.pos.sale.dto.SaleTicketResponse;
 import com.guarani.pos.sale.dto.SaleVatSummaryResponse;
+import com.guarani.pos.sale.dto.SalesByCashierReportResponse;
+import com.guarani.pos.sale.dto.SalesByDayReportResponse;
 import com.guarani.pos.sale.dto.SalesOperationalCashierSummaryResponse;
 import com.guarani.pos.sale.dto.SalesOperationalSummaryResponse;
+import com.guarani.pos.sale.dto.SalesReportResponse;
+import com.guarani.pos.sale.dto.SalesReportSummaryResponse;
+import com.guarani.pos.sale.dto.TopProductReportResponse;
 import com.guarani.pos.sale.model.Sale;
 import com.guarani.pos.sale.model.SaleDetail;
 import com.guarani.pos.sale.model.SalePayment;
@@ -185,6 +193,101 @@ public class SaleService {
                 cashiers);
     }
 
+    @Transactional(readOnly = true)
+    public SalesReportResponse getReports(Long companyId, Long userId, String from, String to) {
+        authorizationService.checkPermission(userId, VENTA_TICKET_VER);
+
+        LocalDate fromDateValue = from != null && !from.isBlank()
+                ? LocalDate.parse(from)
+                : LocalDate.now().withDayOfMonth(1);
+        LocalDate toDateValue = to != null && !to.isBlank()
+                ? LocalDate.parse(to)
+                : LocalDate.now();
+
+        if (toDateValue.isBefore(fromDateValue)) {
+            throw new IllegalArgumentException("La fecha hasta no puede ser menor que la fecha desde.");
+        }
+
+        LocalDateTime fromDate = fromDateValue.atStartOfDay();
+        LocalDateTime toDate = toDateValue.plusDays(1).atStartOfDay();
+
+        List<Sale> reportSales = saleRepository.findReportSales(companyId, fromDate, toDate).stream()
+                .filter(sale -> !"ANULADA".equalsIgnoreCase(sale.getEstado()))
+                .toList();
+
+        BigDecimal grossTotal = BigDecimal.ZERO;
+        BigDecimal discountTotal = BigDecimal.ZERO;
+        BigDecimal returnTotal = BigDecimal.ZERO;
+        BigDecimal netTotal = BigDecimal.ZERO;
+
+        Map<LocalDate, ReportAccumulator> byDay = new LinkedHashMap<>();
+        Map<Long, CashierAccumulator> byCashier = new LinkedHashMap<>();
+        Map<Long, ProductAccumulator> byProduct = new LinkedHashMap<>();
+
+        for (Sale sale : reportSales) {
+            grossTotal = grossTotal.add(nvl(sale.getSubtotal()));
+            discountTotal = discountTotal.add(nvl(sale.getDescuentoTotal()));
+            returnTotal = returnTotal.add(nvl(sale.getReturnTotal()));
+            netTotal = netTotal.add(nvl(sale.getTotal()));
+
+            LocalDate saleDate = sale.getFecha().toLocalDate();
+            byDay.computeIfAbsent(saleDate, ignored -> new ReportAccumulator()).addSale(sale);
+
+            Long cashierId = sale.getCreatedBy() != null ? sale.getCreatedBy().getId() : 0L;
+            String cashierName = sale.getCreatedBy() != null && sale.getCreatedBy().getFullName() != null
+                    ? sale.getCreatedBy().getFullName()
+                    : "Sin usuario";
+            byCashier.computeIfAbsent(cashierId, ignored -> new CashierAccumulator(cashierId, cashierName)).addSale(sale);
+
+            for (SaleDetail detail : sale.getDetails()) {
+                if (detail.getProduct() == null || detail.getProduct().getId() == null) {
+                    continue;
+                }
+
+                BigDecimal netQuantity = nvl(detail.getCantidad()).subtract(nvl(detail.getReturnedQuantity()));
+                BigDecimal netLineTotal = nvl(detail.getSubtotal());
+                if (netQuantity.compareTo(BigDecimal.ZERO) <= 0 && netLineTotal.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+
+                Long productId = detail.getProduct().getId();
+                byProduct.computeIfAbsent(
+                                productId,
+                                ignored -> new ProductAccumulator(productId, detail.getProductoCodigo(), detail.getProductoNombre()))
+                        .add(netQuantity, netLineTotal);
+            }
+        }
+
+        SalesReportSummaryResponse summary = new SalesReportSummaryResponse(
+                fromDateValue.toString(),
+                toDateValue.toString(),
+                reportSales.size(),
+                grossTotal,
+                discountTotal,
+                returnTotal,
+                netTotal,
+                calculateAverage(netTotal, reportSales.size()));
+
+        List<SalesByDayReportResponse> byDayRows = byDay.entrySet().stream()
+                .map(entry -> entry.getValue().toResponse(entry.getKey()))
+                .toList();
+
+        List<SalesByCashierReportResponse> byCashierRows = byCashier.values().stream()
+                .sorted(Comparator.comparing(CashierAccumulator::netTotal).reversed())
+                .map(CashierAccumulator::toResponse)
+                .toList();
+
+        List<TopProductReportResponse> topProducts = byProduct.values().stream()
+                .filter(accumulator -> accumulator.quantity().compareTo(BigDecimal.ZERO) > 0)
+                .sorted(Comparator.comparing(ProductAccumulator::quantity, Comparator.reverseOrder())
+                        .thenComparing(ProductAccumulator::netTotal, Comparator.reverseOrder()))
+                .limit(10)
+                .map(ProductAccumulator::toResponse)
+                .toList();
+
+        return new SalesReportResponse(summary, byDayRows, byCashierRows, topProducts);
+    }
+
     @Transactional
     public SaleResponse create(Long companyId, Long userId, SaleCreateRequest request) {
         authorizationService.checkPermission(userId, VENTA_CREAR);
@@ -230,7 +333,8 @@ public class SaleService {
                 throw new IllegalArgumentException("Stock insuficiente para: " + product.getNombre());
             }
 
-            BigDecimal grossSubtotal = product.getPrecioVenta().multiply(item.quantity());
+            BigDecimal unitPrice = resolveUnitPrice(product, item.quantity());
+            BigDecimal grossSubtotal = unitPrice.multiply(item.quantity());
             BigDecimal itemDiscount = normalizeDiscount(item.discountAmount(), grossSubtotal);
             BigDecimal subtotal = grossSubtotal.subtract(itemDiscount);
 
@@ -239,7 +343,7 @@ public class SaleService {
             detail.setProductoCodigo(product.getCodigo());
             detail.setProductoNombre(product.getNombre());
             detail.setCantidad(item.quantity());
-            detail.setPrecioUnitario(product.getPrecioVenta());
+            detail.setPrecioUnitario(unitPrice);
             detail.setGrossSubtotal(grossSubtotal);
             detail.setDiscountAmount(itemDiscount);
             detail.setSubtotal(subtotal);
@@ -513,6 +617,110 @@ public class SaleService {
                 .filter(p -> method.equals(p.method()))
                 .map(SalePaymentRequest::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal calculateAverage(BigDecimal total, long count) {
+        if (count <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+    }
+
+    private final class ReportAccumulator {
+        private long salesCount;
+        private BigDecimal grossTotal = BigDecimal.ZERO;
+        private BigDecimal discountTotal = BigDecimal.ZERO;
+        private BigDecimal returnTotal = BigDecimal.ZERO;
+        private BigDecimal netTotal = BigDecimal.ZERO;
+
+        void addSale(Sale sale) {
+            salesCount++;
+            grossTotal = grossTotal.add(nvl(sale.getSubtotal()));
+            discountTotal = discountTotal.add(nvl(sale.getDescuentoTotal()));
+            returnTotal = returnTotal.add(nvl(sale.getReturnTotal()));
+            netTotal = netTotal.add(nvl(sale.getTotal()));
+        }
+
+        SalesByDayReportResponse toResponse(LocalDate date) {
+            return new SalesByDayReportResponse(
+                    date.toString(),
+                    salesCount,
+                    grossTotal,
+                    discountTotal,
+                    returnTotal,
+                    netTotal,
+                    calculateAverage(netTotal, salesCount));
+        }
+    }
+
+    private final class CashierAccumulator {
+        private final Long cashierId;
+        private final String cashierName;
+        private long salesCount;
+        private BigDecimal grossTotal = BigDecimal.ZERO;
+        private BigDecimal discountTotal = BigDecimal.ZERO;
+        private BigDecimal returnTotal = BigDecimal.ZERO;
+        private BigDecimal netTotal = BigDecimal.ZERO;
+
+        private CashierAccumulator(Long cashierId, String cashierName) {
+            this.cashierId = cashierId;
+            this.cashierName = cashierName;
+        }
+
+        void addSale(Sale sale) {
+            salesCount++;
+            grossTotal = grossTotal.add(nvl(sale.getSubtotal()));
+            discountTotal = discountTotal.add(nvl(sale.getDescuentoTotal()));
+            returnTotal = returnTotal.add(nvl(sale.getReturnTotal()));
+            netTotal = netTotal.add(nvl(sale.getTotal()));
+        }
+
+        BigDecimal netTotal() {
+            return netTotal;
+        }
+
+        SalesByCashierReportResponse toResponse() {
+            return new SalesByCashierReportResponse(
+                    cashierId,
+                    cashierName,
+                    salesCount,
+                    grossTotal,
+                    discountTotal,
+                    returnTotal,
+                    netTotal,
+                    calculateAverage(netTotal, salesCount));
+        }
+    }
+
+    private final class ProductAccumulator {
+        private final Long productId;
+        private final String productCode;
+        private final String productName;
+        private BigDecimal quantity = BigDecimal.ZERO;
+        private BigDecimal netTotal = BigDecimal.ZERO;
+
+        private ProductAccumulator(Long productId, String productCode, String productName) {
+            this.productId = productId;
+            this.productCode = productCode;
+            this.productName = productName;
+        }
+
+        void add(BigDecimal quantity, BigDecimal netTotal) {
+            this.quantity = this.quantity.add(nvl(quantity));
+            this.netTotal = this.netTotal.add(nvl(netTotal));
+        }
+
+        BigDecimal quantity() {
+            return quantity;
+        }
+
+        BigDecimal netTotal() {
+            return netTotal;
+        }
+
+        TopProductReportResponse toResponse() {
+            return new TopProductReportResponse(productId, productCode, productName, quantity, netTotal);
+        }
     }
 
     private String resolveSalePaymentMethod(List<SalePaymentRequest> paymentRequests, String fallbackMethod) {
@@ -899,6 +1107,20 @@ public class SaleService {
             case "EXENTO" -> "EX";
             default -> "-";
         };
+    }
+
+    private BigDecimal resolveUnitPrice(Product product, BigDecimal quantity) {
+        BigDecimal wholesalePrice = product.getPrecioVentaMayorista();
+        BigDecimal wholesaleMinQuantity = product.getCantidadMayoristaMinima();
+
+        if (wholesalePrice != null
+                && wholesaleMinQuantity != null
+                && wholesaleMinQuantity.compareTo(BigDecimal.ZERO) > 0
+                && quantity.compareTo(wholesaleMinQuantity) >= 0) {
+            return wholesalePrice;
+        }
+
+        return product.getPrecioVenta();
     }
 
     private void registerInventoryMovement(Company company,

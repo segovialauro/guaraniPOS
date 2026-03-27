@@ -26,6 +26,12 @@ public record ProductRequest(
         @NotNull @DecimalMin(value = "0.0", inclusive = false)
         BigDecimal precioVenta,
 
+        @DecimalMin(value = "0.0", inclusive = false)
+        BigDecimal precioVentaMayorista,
+
+        @DecimalMin(value = "0.0", inclusive = false)
+        BigDecimal cantidadMayoristaMinima,
+
         @NotNull @DecimalMin(value = "0.0", inclusive = true)
         BigDecimal stockActual,
 

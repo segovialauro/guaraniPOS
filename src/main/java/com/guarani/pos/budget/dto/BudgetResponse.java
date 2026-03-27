@@ -15,6 +15,9 @@ public record BudgetResponse(
         String status,
         String observation,
         Long saleId,
+        BigDecimal subtotalBeforeDiscounts,
+        BigDecimal discountTotal,
+        BigDecimal globalDiscountAmount,
         BigDecimal total,
         List<BudgetDetailResponse> items
 ) {

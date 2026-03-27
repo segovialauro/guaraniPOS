@@ -3,6 +3,8 @@ package com.guarani.pos.product.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -13,7 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.guarani.pos.product.dto.ProductImportResponse;
 import com.guarani.pos.product.dto.ProductRequest;
 import com.guarani.pos.product.dto.ProductResponse;
 import com.guarani.pos.product.service.ProductService;
@@ -47,6 +51,21 @@ public class ProductController {
     @PostMapping
     public ProductResponse create(@Valid @RequestBody ProductRequest request) {
         return productService.create(SecurityUtils.getCurrentCompanyId(), request);
+    }
+
+    @GetMapping("/plantilla-excel")
+    public ResponseEntity<byte[]> downloadExcelTemplate() {
+        byte[] content = productService.exportExcelTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=plantilla_productos.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(content);
+    }
+
+    @PostMapping("/importar-excel")
+    public ProductImportResponse importExcel(@RequestParam("file") MultipartFile file) {
+        return productService.importFromExcel(SecurityUtils.getCurrentCompanyId(), file);
     }
 
     @PutMapping("/{id}")

@@ -1,29 +1,46 @@
 package com.guarani.pos.purchase.service;
 
-import com.guarani.pos.auth.model.User;
-import com.guarani.pos.auth.repository.UserRepository;
-import com.guarani.pos.auth.service.AuthorizationService;
-import com.guarani.pos.inventory.model.InventoryMovement;
-import com.guarani.pos.inventory.repository.InventoryMovementRepository;
-import com.guarani.pos.purchase.dto.*;
-import com.guarani.pos.purchase.model.Purchase;
-import com.guarani.pos.purchase.model.PurchaseDetail;
-import com.guarani.pos.purchase.model.PurchasePayment;
-import com.guarani.pos.purchase.repository.PurchaseRepository;
-import com.guarani.pos.purchase.security.PurchasePermission;
-import com.guarani.pos.product.model.Product;
-import com.guarani.pos.product.repository.ProductRepository;
-import com.guarani.pos.supplier.model.Supplier;
-import com.guarani.pos.supplier.repository.SupplierRepository;
-import com.guarani.pos.subscription.service.SubscriptionAccessService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.guarani.pos.auth.model.User;
+import com.guarani.pos.auth.repository.UserRepository;
+import com.guarani.pos.auth.service.AuthorizationService;
+import com.guarani.pos.cash.model.CashMovement;
+import com.guarani.pos.cash.model.CashMovementType;
+import com.guarani.pos.cash.model.CashSession;
+import com.guarani.pos.cash.repository.CashMovementRepository;
+import com.guarani.pos.cash.repository.CashSessionRepository;
+import com.guarani.pos.inventory.model.InventoryMovement;
+import com.guarani.pos.inventory.repository.InventoryMovementRepository;
+import com.guarani.pos.product.model.Product;
+import com.guarani.pos.product.repository.ProductRepository;
+import com.guarani.pos.purchase.dto.PurchaseCancelRequest;
+import com.guarani.pos.purchase.dto.PurchaseCreateRequest;
+import com.guarani.pos.purchase.dto.PurchaseDetailResponse;
+import com.guarani.pos.purchase.dto.PurchaseItemRequest;
+import com.guarani.pos.purchase.dto.PurchasePaymentRequest;
+import com.guarani.pos.purchase.dto.PurchasePaymentResponse;
+import com.guarani.pos.purchase.dto.PurchaseReceiveItemRequest;
+import com.guarani.pos.purchase.dto.PurchaseReceiveRequest;
+import com.guarani.pos.purchase.dto.PurchaseResponse;
+import com.guarani.pos.purchase.dto.PurchaseSummaryResponse;
+import com.guarani.pos.purchase.dto.PurchaseUpdateRequest;
+import com.guarani.pos.purchase.model.Purchase;
+import com.guarani.pos.purchase.model.PurchaseDetail;
+import com.guarani.pos.purchase.model.PurchasePayment;
+import com.guarani.pos.purchase.repository.PurchaseRepository;
+import com.guarani.pos.purchase.security.PurchasePermission;
+import com.guarani.pos.sale.repository.SalePaymentRepository;
+import com.guarani.pos.subscription.service.SubscriptionAccessService;
+import com.guarani.pos.supplier.model.Supplier;
+import com.guarani.pos.supplier.repository.SupplierRepository;
 
 @Service
 public class PurchaseService {
@@ -35,24 +52,33 @@ public class PurchaseService {
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final CashSessionRepository cashSessionRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
     private final AuthorizationService authorizationService;
     private final SubscriptionAccessService subscriptionAccessService;
+    private final CashMovementRepository cashMovementRepository;
+    private final SalePaymentRepository salePaymentRepository;
 
     public PurchaseService(PurchaseRepository purchaseRepository,
                            SupplierRepository supplierRepository,
                            ProductRepository productRepository,
                            UserRepository userRepository,
+                           CashSessionRepository cashSessionRepository,
                            InventoryMovementRepository inventoryMovementRepository,
                            AuthorizationService authorizationService,
-                           SubscriptionAccessService subscriptionAccessService) {
+                           SubscriptionAccessService subscriptionAccessService,
+                           CashMovementRepository cashMovementRepository,
+                           SalePaymentRepository salePaymentRepository) {
         this.purchaseRepository = purchaseRepository;
         this.supplierRepository = supplierRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.cashSessionRepository = cashSessionRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
         this.authorizationService = authorizationService;
         this.subscriptionAccessService = subscriptionAccessService;
+        this.cashMovementRepository = cashMovementRepository;
+        this.salePaymentRepository = salePaymentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -183,13 +209,22 @@ public class PurchaseService {
         purchase.setStatus(resolvePurchaseStatus(subtotal, initialPayment));
 
         if (initialPayment.compareTo(BigDecimal.ZERO) > 0) {
+            String paymentMethod = normalizeMethod(request.initialPaymentMethod());
             PurchasePayment payment = new PurchasePayment();
             payment.setUser(user);
             payment.setAmount(initialPayment);
-            payment.setMethod(normalizeMethod(request.initialPaymentMethod()));
+            payment.setMethod(paymentMethod);
             payment.setReference(null);
             payment.setObservation("Pago inicial");
             purchase.addPayment(payment);
+
+            registerCashWithdrawalIfNeeded(
+                    companyId,
+                    user,
+                    initialPayment,
+                    paymentMethod,
+                    "Pago inicial de compra " + request.invoiceNumber().trim() + " - " + supplier.getName()
+            );
         }
 
         return toResponse(purchaseRepository.save(purchase));
@@ -338,10 +373,19 @@ public class PurchaseService {
         PurchasePayment payment = new PurchasePayment();
         payment.setUser(user);
         payment.setAmount(amount);
-        payment.setMethod(normalizeMethod(request.method()));
+        String paymentMethod = normalizeMethod(request.method());
+        payment.setMethod(paymentMethod);
         payment.setReference(trimToNull(request.reference()));
         payment.setObservation(trimToNull(request.observation()));
         purchase.addPayment(payment);
+
+        registerCashWithdrawalIfNeeded(
+                companyId,
+                user,
+                amount,
+                paymentMethod,
+                "Pago a proveedor por compra " + purchase.getInvoiceNumber() + " - " + purchase.getSupplier().getName()
+        );
 
         BigDecimal newPaidAmount = nvl(purchase.getPaidAmount()).add(amount);
         BigDecimal newBalance = nvl(purchase.getTotal()).subtract(newPaidAmount);
@@ -473,6 +517,72 @@ public class PurchaseService {
         movement.setNewStock(newStock);
         movement.setReason(reason);
         inventoryMovementRepository.save(movement);
+    }
+
+    private void registerCashWithdrawalIfNeeded(Long companyId,
+                                                User user,
+                                                BigDecimal amount,
+                                                String method,
+                                                String description) {
+        if (!"EFECTIVO".equalsIgnoreCase(method) || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        CashSession cashSession = cashSessionRepository
+                .findFirstByCompany_IdAndUser_IdAndEstadoOrderByOpenedAtDesc(companyId, user.getId(), "ABIERTA")
+                .orElseGet(() -> cashSessionRepository
+                        .findFirstByCompany_IdAndEstadoOrderByOpenedAtDesc(companyId, "ABIERTA")
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Debe existir una caja abierta para registrar pagos de compras en efectivo."
+                        )));
+
+        BigDecimal availableCash = calculateAvailableCash(cashSession);
+        if (amount.compareTo(availableCash) > 0) {
+            throw new IllegalArgumentException(
+                    "La caja actual no posee suficiente efectivo para registrar este pago. Disponible: "
+                            + formatMoney(availableCash) + "."
+            );
+        }
+
+        CashMovement movement = new CashMovement();
+        movement.setCashSession(cashSession);
+        movement.setCompany(cashSession.getCompany());
+        movement.setUser(user);
+        movement.setType(CashMovementType.RETIRO);
+        movement.setAmount(amount);
+        movement.setDescription(description);
+        cashMovementRepository.save(movement);
+    }
+
+    private BigDecimal calculateAvailableCash(CashSession cashSession) {
+        LocalDateTime from = cashSession.getOpenedAt();
+        LocalDateTime to = LocalDateTime.now();
+
+        BigDecimal cashSales = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(
+                cashSession.getCompany().getId(),
+                from,
+                to,
+                "EFECTIVO"
+        ));
+        BigDecimal manualIncome = nvl(cashMovementRepository.sumByCashSessionAndTypeAndStatus(
+                cashSession.getId(),
+                CashMovementType.INGRESO,
+                com.guarani.pos.cash.model.CashMovementStatus.ACTIVO
+        ));
+        BigDecimal manualWithdrawal = nvl(cashMovementRepository.sumByCashSessionAndTypeAndStatus(
+                cashSession.getId(),
+                CashMovementType.RETIRO,
+                com.guarani.pos.cash.model.CashMovementStatus.ACTIVO
+        ));
+
+        return nvl(cashSession.getOpeningAmount())
+                .add(cashSales)
+                .add(manualIncome)
+                .subtract(manualWithdrawal);
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        return "Gs. " + nvl(amount).toPlainString();
     }
 
     private void validateCanEditPurchase(Purchase purchase) {

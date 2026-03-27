@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 
 public record BudgetItemRequest(
         @NotNull Long productId,
-        @NotNull @DecimalMin(value = "0.01", inclusive = true) BigDecimal quantity
+        @NotNull @DecimalMin(value = "0.01", inclusive = true) BigDecimal quantity,
+        @DecimalMin(value = "0.00", inclusive = true) BigDecimal discountAmount
 ) {
 }

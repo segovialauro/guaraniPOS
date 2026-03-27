@@ -33,6 +33,12 @@ public class BudgetDetail {
     @Column(name = "precio_unitario", nullable = false, precision = 15, scale = 2)
     private BigDecimal precioUnitario;
 
+    @Column(name = "gross_subtotal", nullable = false, precision = 15, scale = 2)
+    private BigDecimal grossSubtotal = BigDecimal.ZERO;
+
+    @Column(name = "discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal subtotal;
 
@@ -49,6 +55,10 @@ public class BudgetDetail {
     public void setCantidad(BigDecimal cantidad) { this.cantidad = cantidad; }
     public BigDecimal getPrecioUnitario() { return precioUnitario; }
     public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
+    public BigDecimal getGrossSubtotal() { return grossSubtotal; }
+    public void setGrossSubtotal(BigDecimal grossSubtotal) { this.grossSubtotal = grossSubtotal; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
 }

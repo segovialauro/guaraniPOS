@@ -16,6 +16,19 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
 	List<Sale> findTop20ByCompanyIdOrderByFechaDesc(Long companyId);
 
+	@Query("""
+			select distinct s
+			from Sale s
+			left join fetch s.createdBy u
+			left join fetch s.details d
+			left join fetch d.product p
+			where s.company.id = :companyId
+			  and s.fecha >= :fromDate
+			  and s.fecha < :toDate
+			order by s.fecha asc
+			""")
+	List<Sale> findReportSales(Long companyId, LocalDateTime fromDate, LocalDateTime toDate);
+
 	long countByCompanyId(Long companyId);
 
 	@Query("""

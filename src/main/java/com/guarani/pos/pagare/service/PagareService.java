@@ -1,25 +1,35 @@
 package com.guarani.pos.pagare.service;
 
-import com.guarani.pos.auth.model.User;
-import com.guarani.pos.auth.repository.UserRepository;
-import com.guarani.pos.company.model.Company;
-import com.guarani.pos.company.repository.CompanyRepository;
-import com.guarani.pos.customer.model.Customer;
-import com.guarani.pos.customer.repository.CustomerRepository;
-import com.guarani.pos.pagare.dto.*;
-import com.guarani.pos.pagare.model.Pagare;
-import com.guarani.pos.pagare.model.PagarePago;
-import com.guarani.pos.pagare.repository.PagareRepository;
-import com.guarani.pos.sale.model.Sale;
-import com.guarani.pos.sale.repository.SaleRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Locale;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.guarani.pos.auth.model.User;
+import com.guarani.pos.auth.repository.UserRepository;
+import com.guarani.pos.cash.model.CashMovement;
+import com.guarani.pos.cash.model.CashMovementType;
+import com.guarani.pos.cash.model.CashSession;
+import com.guarani.pos.cash.repository.CashMovementRepository;
+import com.guarani.pos.cash.repository.CashSessionRepository;
+import com.guarani.pos.company.model.Company;
+import com.guarani.pos.company.repository.CompanyRepository;
+import com.guarani.pos.customer.model.Customer;
+import com.guarani.pos.customer.repository.CustomerRepository;
+import com.guarani.pos.pagare.dto.PagareCreateRequest;
+import com.guarani.pos.pagare.dto.PagarePaymentRequest;
+import com.guarani.pos.pagare.dto.PagarePaymentResponse;
+import com.guarani.pos.pagare.dto.PagareResponse;
+import com.guarani.pos.pagare.model.Pagare;
+import com.guarani.pos.pagare.model.PagarePago;
+import com.guarani.pos.pagare.repository.PagareRepository;
+import com.guarani.pos.sale.model.Sale;
+import com.guarani.pos.sale.repository.SaleRepository;
 
 @Service
 public class PagareService {
@@ -29,17 +39,23 @@ public class PagareService {
     private final CustomerRepository customerRepository;
     private final SaleRepository saleRepository;
     private final UserRepository userRepository;
+    private final CashSessionRepository cashSessionRepository;
+    private final CashMovementRepository cashMovementRepository;
 
     public PagareService(PagareRepository pagareRepository,
                          CompanyRepository companyRepository,
                          CustomerRepository customerRepository,
                          SaleRepository saleRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         CashSessionRepository cashSessionRepository,
+                         CashMovementRepository cashMovementRepository) {
         this.pagareRepository = pagareRepository;
         this.companyRepository = companyRepository;
         this.customerRepository = customerRepository;
         this.saleRepository = saleRepository;
         this.userRepository = userRepository;
+        this.cashSessionRepository = cashSessionRepository;
+        this.cashMovementRepository = cashMovementRepository;
     }
 
     @Transactional(readOnly = true)
@@ -47,6 +63,25 @@ public class PagareService {
         updateOverdueStatuses(companyId);
 
         return pagareRepository.findTop20ByCompanyIdOrderByFechaEmisionDesc(companyId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PagareResponse> findAuditHistory(Long companyId, String from, String to, String status, String q) {
+        updateOverdueStatuses(companyId);
+
+        LocalDate fromDate = from != null && !from.isBlank() ? LocalDate.parse(from) : LocalDate.of(2000, 1, 1);
+        LocalDate toDate = to != null && !to.isBlank() ? LocalDate.parse(to) : LocalDate.of(2999, 12, 31);
+        String normalizedStatus = status != null && !status.isBlank()
+                ? status.trim().toUpperCase(Locale.ROOT)
+                : "";
+        String queryPattern = q != null && !q.isBlank()
+                ? "%" + q.trim().toUpperCase(Locale.ROOT) + "%"
+                : "";
+
+        return pagareRepository.search(companyId, fromDate, toDate, normalizedStatus, queryPattern)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -86,16 +121,19 @@ public class PagareService {
     }
 
     @Transactional
-    public PagareResponse registerPayment(Long companyId, Long pagareId, PagarePaymentRequest request) {
+    public PagareResponse registerPayment(Long companyId, Long userId, Long pagareId, PagarePaymentRequest request) {
         Pagare pagare = pagareRepository.findByIdAndCompanyId(pagareId, companyId)
-                .orElseThrow(() -> new IllegalArgumentException("Pagaré no encontrado."));
+                .orElseThrow(() -> new IllegalArgumentException("Pagare no encontrado."));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         if ("PAGADO".equalsIgnoreCase(pagare.getEstado())) {
-            throw new IllegalArgumentException("El pagaré ya está pagado.");
+            throw new IllegalArgumentException("El pagare ya esta pagado.");
         }
 
         if ("ANULADO".equalsIgnoreCase(pagare.getEstado())) {
-            throw new IllegalArgumentException("El pagaré está anulado.");
+            throw new IllegalArgumentException("El pagare esta anulado.");
         }
 
         if (request.amount().compareTo(pagare.getSaldo()) > 0) {
@@ -111,6 +149,14 @@ public class PagareService {
         pagare.getPagos().add(pago);
         pagare.setSaldo(pagare.getSaldo().subtract(request.amount()));
 
+        registerCashIncomeIfNeeded(
+                companyId,
+                user,
+                request.amount(),
+                request.paymentMethod(),
+                "Cobro de pagare " + pagare.getNumeroPagare() + " - " + pagare.getCustomer().getNombre()
+        );
+
         if (pagare.getSaldo().compareTo(BigDecimal.ZERO) == 0) {
             pagare.setEstado("PAGADO");
         } else {
@@ -118,6 +164,33 @@ public class PagareService {
         }
 
         return toResponse(pagareRepository.save(pagare));
+    }
+
+    private void registerCashIncomeIfNeeded(Long companyId,
+                                            User user,
+                                            BigDecimal amount,
+                                            String paymentMethod,
+                                            String description) {
+        if (!"EFECTIVO".equalsIgnoreCase(paymentMethod) || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        CashSession cashSession = cashSessionRepository
+                .findFirstByCompany_IdAndUser_IdAndEstadoOrderByOpenedAtDesc(companyId, user.getId(), "ABIERTA")
+                .orElseGet(() -> cashSessionRepository
+                        .findFirstByCompany_IdAndEstadoOrderByOpenedAtDesc(companyId, "ABIERTA")
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Debe existir una caja abierta para registrar cobros de pagares en efectivo."
+                        )));
+
+        CashMovement movement = new CashMovement();
+        movement.setCashSession(cashSession);
+        movement.setCompany(cashSession.getCompany());
+        movement.setUser(user);
+        movement.setType(CashMovementType.INGRESO);
+        movement.setAmount(amount);
+        movement.setDescription(description);
+        cashMovementRepository.save(movement);
     }
 
     private void updateOverdueStatuses(Long companyId) {
@@ -140,8 +213,12 @@ public class PagareService {
     }
 
     private String resolveInitialStatus(LocalDate dueDate, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) return "PAGADO";
-        if (dueDate.isBefore(LocalDate.now())) return "VENCIDO";
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return "PAGADO";
+        }
+        if (dueDate.isBefore(LocalDate.now())) {
+            return "VENCIDO";
+        }
         return "PENDIENTE";
     }
 
