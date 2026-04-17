@@ -13,6 +13,8 @@ public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
     Optional<Supplier> findByIdAndCompanyId(Long id, Long companyId);
 
+    boolean existsByCompanyIdAndRucIgnoreCase(Long companyId, String ruc);
+
     @Query("""
             select s
             from Supplier s

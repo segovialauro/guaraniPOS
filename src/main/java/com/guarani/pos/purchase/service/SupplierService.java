@@ -51,6 +51,11 @@ public class SupplierService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
+        String ruc = trimToNull(request.ruc());
+        if (ruc != null && supplierRepository.existsByCompanyIdAndRucIgnoreCase(companyId, ruc)) {
+            throw new IllegalArgumentException("Ya existe un proveedor con ese RUC.");
+        }
+
         Supplier supplier = new Supplier();
         supplier.setCompany(company);
         apply(supplier, request);

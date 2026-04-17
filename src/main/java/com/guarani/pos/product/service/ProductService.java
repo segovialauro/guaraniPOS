@@ -53,6 +53,8 @@ public class ProductService {
             throw new IllegalArgumentException("Ya existe un producto con ese código.");
         }
 
+        validateUniqueBarcode(companyId, trimToNull(request.codigoBarras()), null);
+
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
@@ -76,6 +78,8 @@ public class ProductService {
         if (productRepository.existsByCompanyIdAndCodigoIgnoreCaseAndIdNot(companyId, request.codigo(), id)) {
             throw new IllegalArgumentException("Ya existe otro producto con ese código.");
         }
+
+        validateUniqueBarcode(companyId, trimToNull(request.codigoBarras()), id);
 
         apply(product, request);
 
@@ -202,6 +206,13 @@ public class ProductService {
                     continue;
                 }
 
+                String codigoBarras = trimToNull(readCell(row, 12, formatter));
+                if (codigoBarras != null
+                        && productRepository.existsByCompanyIdAndCodigoBarrasIgnoreCase(companyId, codigoBarras)) {
+                    skipped++;
+                    continue;
+                }
+
                 Product product = new Product();
                 product.setCompany(company);
                 product.setCodigo(codigo.trim());
@@ -216,7 +227,7 @@ public class ProductService {
                 product.setStockMinimo(readDecimal(row, 9, formatter, true));
                 product.setUnidadMedida(defaultIfBlank(readCell(row, 10, formatter), "UNIDAD"));
                 product.setVatType(normalizeVatType(defaultIfBlank(readCell(row, 11, formatter), "IVA_10")));
-                product.setCodigoBarras(trimToNull(readCell(row, 12, formatter)));
+                product.setCodigoBarras(codigoBarras);
                 product.setActivo(readBoolean(row, 13, formatter));
 
                 validateWholesalePricing(new ProductRequest(
@@ -267,7 +278,21 @@ public class ProductService {
         product.setUnidadMedida(request.unidadMedida().trim());
         product.setVatType(normalizeVatType(request.vatType()));
         product.setActivo(request.activo());
-        product.setCodigoBarras(request.codigoBarras());
+        product.setCodigoBarras(trimToNull(request.codigoBarras()));
+    }
+
+    private void validateUniqueBarcode(Long companyId, String codigoBarras, Long currentId) {
+        if (codigoBarras == null) {
+            return;
+        }
+
+        boolean exists = currentId == null
+                ? productRepository.existsByCompanyIdAndCodigoBarrasIgnoreCase(companyId, codigoBarras)
+                : productRepository.existsByCompanyIdAndCodigoBarrasIgnoreCaseAndIdNot(companyId, codigoBarras, currentId);
+
+        if (exists) {
+            throw new IllegalArgumentException("Ya existe un producto con ese código de barras.");
+        }
     }
 
     private ProductResponse toResponse(Product product) {

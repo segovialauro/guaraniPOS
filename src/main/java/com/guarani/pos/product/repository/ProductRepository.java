@@ -20,6 +20,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	boolean existsByCompanyIdAndCodigoIgnoreCaseAndIdNot(Long companyId, String codigo, Long id);
 
+	boolean existsByCompanyIdAndCodigoBarrasIgnoreCase(Long companyId, String codigoBarras);
+
+	boolean existsByCompanyIdAndCodigoBarrasIgnoreCaseAndIdNot(Long companyId, String codigoBarras, Long id);
+
 	@Query("""
 			    select p
 			    from Product p

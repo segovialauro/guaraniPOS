@@ -7,7 +7,7 @@ public record SupplierRequest(
         @NotBlank @Size(max = 150)
         String name,
 
-        @Size(max = 30)
+        @NotBlank @Size(max = 30)
         String ruc,
 
         @Size(max = 30)

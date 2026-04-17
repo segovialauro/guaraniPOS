@@ -7,7 +7,7 @@ public record CustomerRequest(
         @NotBlank @Size(max = 150)
         String nombre,
 
-        @Size(max = 30)
+        @NotBlank @Size(max = 30)
         String documento,
 
         @Size(max = 30)
