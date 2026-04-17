@@ -13,6 +13,14 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByIdAndCompanyId(Long id, Long companyId);
 
+    boolean existsByCompanyIdAndDocumentoIgnoreCase(Long companyId, String documento);
+
+    boolean existsByCompanyIdAndDocumentoIgnoreCaseAndIdNot(Long companyId, String documento, Long id);
+
+    boolean existsByCompanyIdAndRucIgnoreCase(Long companyId, String ruc);
+
+    boolean existsByCompanyIdAndRucIgnoreCaseAndIdNot(Long companyId, String ruc, Long id);
+
     @Query("""
         select c
         from Customer c

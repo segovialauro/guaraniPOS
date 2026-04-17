@@ -44,6 +44,8 @@ public class CustomerService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
+        validateDuplicates(companyId, request, null);
+
         Customer customer = new Customer();
         customer.setCompany(company);
         apply(customer, request);
@@ -56,6 +58,7 @@ public class CustomerService {
         Customer customer = customerRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado."));
 
+        validateDuplicates(companyId, request, id);
         apply(customer, request);
         return toResponse(customerRepository.save(customer));
     }
@@ -70,17 +73,49 @@ public class CustomerService {
 
     private void apply(Customer customer, CustomerRequest request) {
         customer.setNombre(request.nombre().trim());
-        customer.setDocumento(request.documento());
+        customer.setDocumento(trimToNull(request.documento()));
         customer.setDocumentType(request.documentType());
-        customer.setRuc(request.ruc());
-        customer.setTelefono(request.telefono());
-        customer.setEmail(request.email());
-        customer.setDireccion(request.direccion());
+        customer.setRuc(trimToNull(request.ruc()));
+        customer.setTelefono(trimToNull(request.telefono()));
+        customer.setEmail(trimToNull(request.email()));
+        customer.setDireccion(trimToNull(request.direccion()));
         customer.setGender(request.gender());
         customer.setSegment(request.segment());
         customer.setTaxProfile(request.taxProfile());
-        customer.setObservacion(request.observacion());
+        customer.setObservacion(trimToNull(request.observacion()));
         customer.setActivo(request.activo());
+    }
+
+    private void validateDuplicates(Long companyId, CustomerRequest request, Long currentId) {
+        String documento = trimToNull(request.documento());
+        String ruc = trimToNull(request.ruc());
+
+        if (documento != null) {
+            boolean exists = currentId == null
+                    ? customerRepository.existsByCompanyIdAndDocumentoIgnoreCase(companyId, documento)
+                    : customerRepository.existsByCompanyIdAndDocumentoIgnoreCaseAndIdNot(companyId, documento, currentId);
+            if (exists) {
+                throw new IllegalArgumentException("Ya existe un cliente con ese documento.");
+            }
+        }
+
+        if (ruc != null) {
+            boolean exists = currentId == null
+                    ? customerRepository.existsByCompanyIdAndRucIgnoreCase(companyId, ruc)
+                    : customerRepository.existsByCompanyIdAndRucIgnoreCaseAndIdNot(companyId, ruc, currentId);
+            if (exists) {
+                throw new IllegalArgumentException("Ya existe un cliente con ese RUC.");
+            }
+        }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private CustomerResponse toResponse(Customer c) {
