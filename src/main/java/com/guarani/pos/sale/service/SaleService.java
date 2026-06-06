@@ -190,12 +190,16 @@ public class SaleService {
                         .filter(s -> "DEVUELTA_TOTAL".equals(s.status()))
                         .map(SaleResponse::returnTotal)
                         .reduce(BigDecimal.ZERO, BigDecimal::add),
+                sales.stream()
+                        .filter(s -> !"ANULADA".equals(s.status()))
+                        .map(SaleResponse::total)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add),
                 cashiers);
     }
 
     @Transactional(readOnly = true)
     public SalesReportResponse getReports(Long companyId, Long userId, String from, String to) {
-        authorizationService.checkPermission(userId, VENTA_TICKET_VER);
+        authorizationService.checkPermission(companyId, userId, VENTA_TICKET_VER);
 
         LocalDate fromDateValue = from != null && !from.isBlank()
                 ? LocalDate.parse(from)
@@ -290,12 +294,12 @@ public class SaleService {
 
     @Transactional
     public SaleResponse create(Long companyId, Long userId, SaleCreateRequest request) {
-        authorizationService.checkPermission(userId, VENTA_CREAR);
+        authorizationService.checkPermission(companyId, userId, VENTA_CREAR);
 
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         CashSession cashSession = cashSessionRepository
@@ -419,7 +423,7 @@ public class SaleService {
 
     @Transactional
     public SaleResponse cancel(Long companyId, Long userId, Long saleId, SaleCancelRequest request) {
-        authorizationService.checkPermission(userId, VENTA_ANULAR);
+        authorizationService.checkPermission(companyId, userId, VENTA_ANULAR);
 
         Sale sale = saleRepository.findByIdAndCompany_Id(saleId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada."));
@@ -428,7 +432,7 @@ public class SaleService {
             throw new IllegalArgumentException("Solo se pueden anular ventas confirmadas.");
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         for (SaleDetail detail : sale.getDetails()) {
@@ -466,7 +470,7 @@ public class SaleService {
 
     @Transactional
     public SaleResponse partialReturn(Long companyId, Long userId, Long saleId, SaleReturnRequest request) {
-        authorizationService.checkPermission(userId, VENTA_DEVOLVER);
+        authorizationService.checkPermission(companyId, userId, VENTA_DEVOLVER);
 
         Sale sale = saleRepository.findByIdAndCompany_Id(saleId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada."));
@@ -475,7 +479,7 @@ public class SaleService {
             throw new IllegalArgumentException("Solo se permiten devoluciones sobre ventas confirmadas o parcialmente devueltas.");
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         BigDecimal returnAmount = BigDecimal.ZERO;
@@ -491,7 +495,8 @@ public class SaleService {
                 throw new IllegalArgumentException("La cantidad a devolver supera lo disponible para: " + detail.getProductoNombre());
             }
 
-            BigDecimal lineNetUnit = nvl(detail.getSubtotal()).divide(nvl(detail.getCantidad()), 4, RoundingMode.HALF_UP);
+            BigDecimal originalLineNet = nvl(detail.getSubtotal()).add(nvl(detail.getReturnedAmount()));
+            BigDecimal lineNetUnit = originalLineNet.divide(nvl(detail.getCantidad()), 4, RoundingMode.HALF_UP);
             BigDecimal itemReturnAmount = lineNetUnit.multiply(item.quantity()).setScale(2, RoundingMode.HALF_UP);
 
             detail.setReturnedQuantity(nvl(detail.getReturnedQuantity()).add(item.quantity()));
@@ -579,23 +584,25 @@ public class SaleService {
     }
 
     private void revertSalePaymentsProportionally(Sale sale, BigDecimal returnAmount) {
-        List<SalePayment> payments = sale.getPayments();
-        BigDecimal originalTotal = nvl(sale.getTotal());
+        List<SalePayment> payments = sale.getPayments().stream()
+                .filter(payment -> payment.getCashSession() != null)
+                .toList();
+        BigDecimal originalNetTotal = nvl(sale.getTotal()).add(nvl(sale.getReturnTotal()));
         BigDecimal remaining = returnAmount;
+
+        if (payments.isEmpty()) {
+            return;
+        }
 
         for (int i = 0; i < payments.size(); i++) {
             SalePayment payment = payments.get(i);
-            if (payment.getCashSession() == null) {
-                continue;
-            }
-
             BigDecimal refundAmount;
             if (i == payments.size() - 1) {
                 refundAmount = remaining;
             } else {
                 refundAmount = nvl(payment.getAmount())
                         .multiply(returnAmount)
-                        .divide(originalTotal, 2, RoundingMode.HALF_UP);
+                        .divide(originalNetTotal, 2, RoundingMode.HALF_UP);
             }
 
             SalePayment refundPayment = new SalePayment();
@@ -870,7 +877,7 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public SaleTicketResponse getTicket(Long companyId, Long userId, Long saleId) {
-        authorizationService.checkPermission(userId, VENTA_TICKET_VER);
+        authorizationService.checkPermission(companyId, userId, VENTA_TICKET_VER);
 
         Sale sale = saleRepository.findByIdAndCompany_Id(saleId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada."));
@@ -923,7 +930,7 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public byte[] generateTicketPdf(Long companyId, Long userId, Long saleId) {
-        authorizationService.checkPermission(userId, VENTA_TICKET_DESCARGAR);
+        authorizationService.checkPermission(companyId, userId, VENTA_TICKET_DESCARGAR);
 
         SaleTicketResponse ticket = getTicket(companyId, userId, saleId);
 

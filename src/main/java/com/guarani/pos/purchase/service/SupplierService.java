@@ -13,7 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SupplierService {
@@ -35,18 +37,22 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public List<SupplierResponse> findAll(Long companyId, Long userId, String q) {
-        authorizationService.checkPermission(userId, PurchasePermission.PROVEEDOR_VER);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.PROVEEDOR_VER);
 
         List<Supplier> suppliers = (q == null || q.isBlank())
                 ? supplierRepository.findByCompanyIdOrderByNameAsc(companyId)
                 : supplierRepository.search(companyId, q.trim());
 
-        return suppliers.stream().map(this::toResponse).toList();
+        Map<Long, BigDecimal> payableBalancesBySupplier = loadPayableBalancesBySupplier(companyId);
+
+        return suppliers.stream()
+                .map(supplier -> toResponse(supplier, payableBalancesBySupplier))
+                .toList();
     }
 
     @Transactional
     public SupplierResponse create(Long companyId, Long userId, SupplierRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.PROVEEDOR_GESTIONAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.PROVEEDOR_GESTIONAR);
 
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
@@ -59,7 +65,8 @@ public class SupplierService {
         Supplier supplier = new Supplier();
         supplier.setCompany(company);
         apply(supplier, request);
-        return toResponse(supplierRepository.save(supplier));
+        Supplier savedSupplier = supplierRepository.save(supplier);
+        return toResponse(savedSupplier, Map.of());
     }
 
     private void apply(Supplier supplier, SupplierRequest request) {
@@ -72,17 +79,8 @@ public class SupplierService {
         supplier.setActive(request.active());
     }
 
-    private SupplierResponse toResponse(Supplier supplier) {
-        BigDecimal payableBalance = purchaseRepository.search(
-                        supplier.getCompany().getId(),
-                        "",
-                        null,
-                        null,
-                        "")
-                .stream()
-                .filter(p -> p.getSupplier() != null && supplier.getId().equals(p.getSupplier().getId()))
-                .map(p -> p.getBalance() != null ? p.getBalance() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    private SupplierResponse toResponse(Supplier supplier, Map<Long, BigDecimal> payableBalancesBySupplier) {
+        BigDecimal payableBalance = payableBalancesBySupplier.getOrDefault(supplier.getId(), BigDecimal.ZERO);
 
         return new SupplierResponse(
                 supplier.getId(),
@@ -95,6 +93,20 @@ public class SupplierService {
                 supplier.isActive(),
                 payableBalance
         );
+    }
+
+    private Map<Long, BigDecimal> loadPayableBalancesBySupplier(Long companyId) {
+        Map<Long, BigDecimal> balances = new HashMap<>();
+
+        for (Object[] row : purchaseRepository.sumPayableBalanceGroupedBySupplier(companyId)) {
+            Long supplierId = row[0] instanceof Number number ? number.longValue() : null;
+            BigDecimal balance = row[1] instanceof BigDecimal value ? value : BigDecimal.ZERO;
+            if (supplierId != null) {
+                balances.put(supplierId, balance);
+            }
+        }
+
+        return balances;
     }
 
     private String trimToNull(String value) {

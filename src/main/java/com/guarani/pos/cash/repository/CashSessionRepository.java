@@ -34,6 +34,8 @@ public interface CashSessionRepository extends JpaRepository<CashSession, Long> 
             Long userId,
             String estado
     );
+
+    Optional<CashSession> findByIdAndCompany_Id(Long id, Long companyId);
     
     long countByCompany_IdAndEstado(Long companyId, String estado);
 }

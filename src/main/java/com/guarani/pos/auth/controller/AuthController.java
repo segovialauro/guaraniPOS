@@ -41,7 +41,10 @@ public class AuthController {
     @GetMapping("/me/permissions")
     public CurrentPermissionsResponse myPermissions() {
         return new CurrentPermissionsResponse(
-                authorizationService.getPermissionsByUserId(SecurityUtils.getCurrentUserId())
+                authorizationService.getPermissionsByUserId(
+                        SecurityUtils.getCurrentCompanyId(),
+                        SecurityUtils.getCurrentUserId()
+                )
         );
     }
 }

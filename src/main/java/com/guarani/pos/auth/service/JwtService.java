@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import com.guarani.pos.tenant.TenantResolution;
+
 @Service
 public class JwtService {
 
@@ -22,7 +24,7 @@ public class JwtService {
     @Value("${app.jwt.expiration-minutes}")
     private long expirationMinutes;
 
-    public String generateToken(User user) {
+    public String generateToken(User user, TenantResolution tenantResolution) {
         Instant now = Instant.now();
 
         return Jwts.builder()
@@ -30,6 +32,8 @@ public class JwtService {
                 .claim("userId", user.getId())
                 .claim("companyId", user.getCompany().getId())
                 .claim("tenant", user.getCompany().getCode())
+                .claim("tenantDatasourceKey", tenantResolution.datasourceKey())
+                .claim("tenantDatabaseMode", tenantResolution.databaseMode().name())
                 .claim("role", user.getRoleCode())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(expirationMinutes, ChronoUnit.MINUTES)))

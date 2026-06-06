@@ -22,4 +22,13 @@ public interface SalePaymentRepository extends JpaRepository<SalePayment, Long> 
                                                   LocalDateTime startDateTime,
                                                   LocalDateTime endDateTime,
                                                   String paymentMethod);
+
+    @Query("""
+        select coalesce(sum(p.amount), 0)
+        from SalePayment p
+        where p.cashSession.id = :cashSessionId
+          and p.sale.estado = 'CONFIRMADA'
+          and p.method = :paymentMethod
+    """)
+    BigDecimal sumByCashSessionAndPaymentMethod(Long cashSessionId, String paymentMethod);
 }

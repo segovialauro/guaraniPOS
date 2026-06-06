@@ -13,6 +13,7 @@ public record SalesOperationalSummaryResponse(
         BigDecimal partialReturnTotal,
         long totalReturnCount,
         BigDecimal totalReturnTotal,
+        BigDecimal netOperationalTotal,
         List<SalesOperationalCashierSummaryResponse> cashiers
 ) {
 }

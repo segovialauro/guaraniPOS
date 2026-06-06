@@ -73,6 +73,19 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 			""")
 	BigDecimal sumByCompanyAndDateTimePeriod(Long companyId, LocalDateTime startDateTime,
 			LocalDateTime endDateTime);
+
+	@Query("""
+			    select coalesce(sum(s.total), 0)
+			    from Sale s
+			    where s.estado = 'CONFIRMADA'
+			      and exists (
+			          select 1
+			          from SalePayment p
+			          where p.sale = s
+			            and p.cashSession.id = :cashSessionId
+			      )
+			""")
+	BigDecimal sumConfirmedTotalByCashSession(Long cashSessionId);
 	
 	Optional<Sale> findByIdAndCompany_Id(Long id, Long companyId);
 

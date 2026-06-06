@@ -47,7 +47,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public InventorySummaryResponse getSummary(Long companyId, Long userId) {
-        authorizationService.checkPermission(userId, InventoryPermission.INVENTARIO_VER);
+        authorizationService.checkPermission(companyId, userId, InventoryPermission.INVENTARIO_VER);
 
         List<Product> products = productRepository.findByCompanyIdOrderByNombreAsc(companyId).stream()
                 .filter(Product::isActivo)
@@ -91,7 +91,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<InventoryItemResponse> findProducts(Long companyId, Long userId, String q, String category, boolean lowStockOnly) {
-        authorizationService.checkPermission(userId, InventoryPermission.INVENTARIO_VER);
+        authorizationService.checkPermission(companyId, userId, InventoryPermission.INVENTARIO_VER);
 
         String normalizedQuery = q == null ? "" : q.trim();
         String normalizedCategory = category == null ? "" : category.trim().toUpperCase(Locale.ROOT);
@@ -112,7 +112,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<InventoryMovementResponse> findRecentMovements(Long companyId, Long userId, Long productId) {
-        authorizationService.checkPermission(userId, InventoryPermission.INVENTARIO_VER);
+        authorizationService.checkPermission(companyId, userId, InventoryPermission.INVENTARIO_VER);
 
         List<InventoryMovement> movements = productId == null
                 ? inventoryMovementRepository.findTop20ByCompanyIdOrderByCreatedAtDesc(companyId)
@@ -126,12 +126,12 @@ public class InventoryService {
 
     @Transactional
     public InventoryMovementResponse adjustStock(Long companyId, Long userId, InventoryAdjustRequest request) {
-        authorizationService.checkPermission(userId, InventoryPermission.INVENTARIO_AJUSTAR);
+        authorizationService.checkPermission(companyId, userId, InventoryPermission.INVENTARIO_AJUSTAR);
 
         companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         Product product = productRepository.findByIdAndCompanyId(request.productId(), companyId)

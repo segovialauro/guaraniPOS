@@ -13,6 +13,8 @@ import com.guarani.pos.auth.model.User;
 import com.guarani.pos.auth.repository.UserRepository;
 import com.guarani.pos.company.model.Company;
 import com.guarani.pos.company.repository.CompanyRepository;
+import com.guarani.pos.tenant.TenantRegistryService;
+import com.guarani.pos.tenant.TenantResolution;
 
 @Service
 public class AuthService {
@@ -21,15 +23,18 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TenantRegistryService tenantRegistryService;
 
     public AuthService(CompanyRepository companyRepository,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       TenantRegistryService tenantRegistryService) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.tenantRegistryService = tenantRegistryService;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +70,8 @@ public class AuthService {
     }
 
     private Company resolveAndValidateCompany(String tenantCode) {
-        Company company = companyRepository.findByCodeIgnoreCase(tenantCode)
+        TenantResolution tenant = tenantRegistryService.resolveByTenantCode(tenantCode);
+        Company company = companyRepository.findById(tenant.companyId())
                 .orElseThrow(() -> new IllegalArgumentException("Empresa o licencia no valida."));
 
         if (!"ACTIVA".equalsIgnoreCase(company.getStatus())) {
@@ -90,8 +96,9 @@ public class AuthService {
     }
 
     private LoginResponse buildResponse(User user) {
+        TenantResolution tenantResolution = tenantRegistryService.resolveByCompanyId(user.getCompany().getId());
         return new LoginResponse(
-                jwtService.generateToken(user),
+                jwtService.generateToken(user, tenantResolution),
                 user.getCompany().getCode(),
                 user.getCompany().getName(),
                 user.getId(),

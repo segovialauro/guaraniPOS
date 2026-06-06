@@ -9,15 +9,15 @@ import static com.guarani.pos.cash.security.CashPermission.CAJA_REPORTE_DESCARGA
 import static com.guarani.pos.cash.security.CashPermission.CAJA_REPORTE_VER;
 import static com.guarani.pos.inventory.security.InventoryPermission.INVENTARIO_AJUSTAR;
 import static com.guarani.pos.inventory.security.InventoryPermission.INVENTARIO_VER;
-import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_PAGAR;
-import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_EDITAR;
 import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_ANULAR;
+import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_EDITAR;
+import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_PAGAR;
 import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_REGISTRAR;
 import static com.guarani.pos.purchase.security.PurchasePermission.COMPRAS_VER;
 import static com.guarani.pos.purchase.security.PurchasePermission.PROVEEDOR_GESTIONAR;
 import static com.guarani.pos.purchase.security.PurchasePermission.PROVEEDOR_VER;
-import static com.guarani.pos.sale.security.SalePermission.VENTA_CREAR;
 import static com.guarani.pos.sale.security.SalePermission.VENTA_ANULAR;
+import static com.guarani.pos.sale.security.SalePermission.VENTA_CREAR;
 import static com.guarani.pos.sale.security.SalePermission.VENTA_DEVOLVER;
 import static com.guarani.pos.sale.security.SalePermission.VENTA_TICKET_DESCARGAR;
 import static com.guarani.pos.sale.security.SalePermission.VENTA_TICKET_VER;
@@ -41,19 +41,19 @@ public class AuthorizationService {
         this.userRepository = userRepository;
     }
 
-    public Set<String> getPermissionsByUserId(Long userId) {
-        User user = userRepository.findById(userId)
+    public Set<String> getPermissionsByUserId(Long companyId, Long userId) {
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         return getPermissionsByRoleCode(user.getRoleCode());
     }
 
-    public boolean hasPermission(Long userId, String permissionCode) {
-        return getPermissionsByUserId(userId).contains(permissionCode);
+    public boolean hasPermission(Long companyId, Long userId, String permissionCode) {
+        return getPermissionsByUserId(companyId, userId).contains(permissionCode);
     }
 
-    public void checkPermission(Long userId, String permissionCode) {
-        if (!hasPermission(userId, permissionCode)) {
+    public void checkPermission(Long companyId, Long userId, String permissionCode) {
+        if (!hasPermission(companyId, userId, permissionCode)) {
             throw new ForbiddenOperationException("No tienes permisos para realizar esta accion.");
         }
     }

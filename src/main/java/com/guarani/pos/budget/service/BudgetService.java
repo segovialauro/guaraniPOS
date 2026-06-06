@@ -72,7 +72,7 @@ public class BudgetService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         Customer customer = null;
@@ -221,7 +221,7 @@ public class BudgetService {
         );
 
         SaleResponse savedSale = saleService.create(companyId, userId, saleRequest);
-        Sale convertedSale = saleRepository.findById(savedSale.id())
+        Sale convertedSale = saleRepository.findByIdAndCompany_Id(savedSale.id(), companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta convertida no encontrada."));
 
         budget.setEstado("CONVERTIDO");

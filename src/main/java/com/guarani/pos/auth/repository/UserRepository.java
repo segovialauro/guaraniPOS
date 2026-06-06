@@ -37,6 +37,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	Optional<User> findById(Long id);
 
+	Optional<User> findByIdAndCompanyId(Long id, Long companyId);
+
     List<User> findByCompanyIdOrderByFullNameAsc(Long companyId);
 
     boolean existsByCompanyIdAndCedulaIgnoreCase(Long companyId, String cedula);

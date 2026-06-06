@@ -33,6 +33,7 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             from Purchase p
             where p.company.id = :companyId
               and p.purchaseDate between :fromDate and :toDate
+              and p.status <> 'ANULADA'
             """)
     java.math.BigDecimal sumTotalByDateRange(Long companyId, LocalDate fromDate, LocalDate toDate);
 
@@ -44,7 +45,28 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
             """)
     java.math.BigDecimal sumPayableBalance(Long companyId);
 
+    @Query("""
+            select p.supplier.id, coalesce(sum(p.balance), 0)
+            from Purchase p
+            where p.company.id = :companyId
+              and p.balance > 0
+              and p.status <> 'ANULADA'
+            group by p.supplier.id
+            """)
+    List<Object[]> sumPayableBalanceGroupedBySupplier(Long companyId);
+
+    @Query("""
+            select coalesce(sum(p.balance), 0)
+            from Purchase p
+            where p.company.id = :companyId
+              and p.status = 'PENDIENTE'
+              and p.balance > 0
+            """)
+    java.math.BigDecimal sumPendingBalance(Long companyId);
+
     long countByCompanyIdAndBalanceGreaterThan(Long companyId, java.math.BigDecimal amount);
+
+    long countByCompanyIdAndStatusAndBalanceGreaterThan(Long companyId, String status, java.math.BigDecimal amount);
 
     long countByCompanyIdAndCreatedAtBetween(Long companyId, LocalDateTime from, LocalDateTime to);
 

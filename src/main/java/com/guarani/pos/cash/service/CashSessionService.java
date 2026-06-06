@@ -80,7 +80,7 @@ public class CashSessionService {
 	@Transactional
 	public CashSessionResponse open(Long companyId, Long userId, CashOpenRequest request) {
 
-		authorizationService.checkPermission(userId, CashPermission.CAJA_ABRIR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_ABRIR);
 
 		cashSessionRepository.findFirstByCompany_IdAndUser_IdAndEstadoOrderByOpenedAtDesc(companyId, userId, "ABIERTA")
 				.ifPresent(c -> {
@@ -93,7 +93,7 @@ public class CashSessionService {
 		Company company = companyRepository.findById(companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
 
-		User user = userRepository.findById(userId)
+		User user = userRepository.findByIdAndCompanyId(userId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
 		CashSession cash = new CashSession();
@@ -108,7 +108,7 @@ public class CashSessionService {
 
 	@Transactional
 	public CashSessionResponse close(Long companyId, Long userId, CashCloseRequest request) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_CERRAR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_CERRAR);
 		
 		CashSession cash = cashSessionRepository
 				.findFirstByCompany_IdAndUser_IdAndEstadoOrderByOpenedAtDesc(companyId, userId, "ABIERTA")
@@ -143,20 +143,16 @@ public class CashSessionService {
 	}
 
 	private CashSession refreshTotals(CashSession cash) {
-		LocalDateTime from = cash.getOpenedAt();
-		LocalDateTime to = LocalDateTime.now();
+		Long cashSessionId = cash.getId();
 
-		BigDecimal efectivo = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(),
-				from, to, "EFECTIVO"));
-		BigDecimal transferencia = nvl(salePaymentRepository
-				.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "TRANSFERENCIA"));
-		BigDecimal debito = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(),
-				from, to, "TARJETA_DEBITO"));
-		BigDecimal credito = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(),
-				from, to, "TARJETA_CREDITO"));
-		BigDecimal qr = nvl(
-				salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(cash.getCompany().getId(), from, to, "QR"));
-		BigDecimal total = nvl(saleRepository.sumByCompanyAndDateTimePeriod(cash.getCompany().getId(), from, to));
+		BigDecimal efectivo = nvl(salePaymentRepository.sumByCashSessionAndPaymentMethod(cashSessionId, "EFECTIVO"));
+		BigDecimal transferencia = nvl(
+				salePaymentRepository.sumByCashSessionAndPaymentMethod(cashSessionId, "TRANSFERENCIA"));
+		BigDecimal debito = nvl(salePaymentRepository.sumByCashSessionAndPaymentMethod(cashSessionId, "TARJETA_DEBITO"));
+		BigDecimal credito = nvl(
+				salePaymentRepository.sumByCashSessionAndPaymentMethod(cashSessionId, "TARJETA_CREDITO"));
+		BigDecimal qr = nvl(salePaymentRepository.sumByCashSessionAndPaymentMethod(cashSessionId, "QR"));
+		BigDecimal total = nvl(saleRepository.sumConfirmedTotalByCashSession(cashSessionId));
 
 		cash.setCashSystem(efectivo);
 		cash.setTransferSystem(transferencia);
@@ -228,19 +224,17 @@ public class CashSessionService {
 			result = cashSessionRepository.findAllByCompany_IdOrderByOpenedAtDesc(companyId);
 		}
 
-		return result.stream().map(this::toResponse).toList();
+		return result.stream().map(this::refreshAndMap).toList();
 	}
 
 	@Transactional(readOnly = true)
 	public CashCloseReportResponse getCloseReport(Long companyId, Long userId, Long cashSessionId) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_REPORTE_VER);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_REPORTE_VER);
 
-		CashSession cash = cashSessionRepository.findById(cashSessionId)
+		CashSession cash = cashSessionRepository.findByIdAndCompany_Id(cashSessionId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Caja no encontrada."));
 
-		if (!cash.getCompany().getId().equals(companyId)) {
-			throw new IllegalArgumentException("No tienes permisos para ver esta caja.");
-		}
+		cash = refreshTotals(cash);
 
 		BigDecimal manualIncomeTotal = getManualIncomeTotal(cash.getId());
 		BigDecimal manualWithdrawalTotal = getManualWithdrawalTotal(cash.getId());
@@ -265,7 +259,7 @@ public class CashSessionService {
 
 	@Transactional(readOnly = true)
 	public byte[] generateCloseReportPdf(Long companyId, Long userId, Long cashSessionId) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_REPORTE_DESCARGAR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_REPORTE_DESCARGAR);
 
 		CashCloseReportResponse report = getCloseReport(companyId, userId, cashSessionId);
 
@@ -366,13 +360,13 @@ public class CashSessionService {
 
 	@Transactional
 	public CashMovementResponse registerMovement(Long companyId, Long userId, CashMovementRequest request) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_MOVIMIENTO_CREAR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_MOVIMIENTO_CREAR);
 
 		CashSession cash = cashSessionRepository
 		        .findFirstByCompany_IdAndUser_IdAndEstadoOrderByOpenedAtDesc(companyId, userId, "ABIERTA")
 		        .orElseThrow(() -> new IllegalArgumentException("No hay una caja abierta para el usuario."));
 
-		User user = userRepository.findById(userId)
+		User user = userRepository.findByIdAndCompanyId(userId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
 		CashMovement movement = new CashMovement();
@@ -390,7 +384,7 @@ public class CashSessionService {
 	@Transactional
 	public CashMovementResponse updateMovement(Long companyId, Long userId, Long movementId,
 			CashMovementUpdateRequest request) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_MOVIMIENTO_EDITAR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_MOVIMIENTO_EDITAR);
 
 		CashMovement movement = cashMovementRepository.findByIdAndCompany_Id(movementId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Movimiento no encontrado."));
@@ -403,7 +397,7 @@ public class CashSessionService {
 			throw new IllegalArgumentException("No se puede editar un movimiento anulado.");
 		}
 
-		User user = userRepository.findById(userId)
+		User user = userRepository.findByIdAndCompanyId(userId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
 		movement.setType(request.type());
@@ -418,7 +412,7 @@ public class CashSessionService {
 	@Transactional
 	public CashMovementResponse cancelMovement(Long companyId, Long userId, Long movementId,
 			CashMovementCancelRequest request) {
-		authorizationService.checkPermission(userId, CashPermission.CAJA_MOVIMIENTO_ANULAR);
+		authorizationService.checkPermission(companyId, userId, CashPermission.CAJA_MOVIMIENTO_ANULAR);
 
 		CashMovement movement = cashMovementRepository.findByIdAndCompany_Id(movementId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Movimiento no encontrado."));
@@ -431,7 +425,7 @@ public class CashSessionService {
 			throw new IllegalArgumentException("El movimiento ya está anulado.");
 		}
 
-		User user = userRepository.findById(userId)
+		User user = userRepository.findByIdAndCompanyId(userId, companyId)
 				.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
 		movement.setStatus(CashMovementStatus.ANULADO);

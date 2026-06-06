@@ -95,12 +95,12 @@ public class PagareService {
         Customer customer = customerRepository.findByIdAndCompanyId(request.customerId(), companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         Sale sale = null;
         if (request.saleId() != null) {
-            sale = saleRepository.findById(request.saleId())
+            sale = saleRepository.findByIdAndCompany_Id(request.saleId(), companyId)
                     .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada."));
         }
 
@@ -125,7 +125,7 @@ public class PagareService {
         Pagare pagare = pagareRepository.findByIdAndCompanyId(pagareId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Pagare no encontrado."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         if ("PAGADO".equalsIgnoreCase(pagare.getEstado())) {

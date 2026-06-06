@@ -5,53 +5,60 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 public final class SecurityUtils {
 
-	private SecurityUtils() {
-	}
+    private SecurityUtils() {
+    }
 
-	public static Long getCurrentCompanyId() {
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    public static Long getCurrentCompanyId() {
+        return getCurrentTenant().companyId();
+    }
 
-		if (authentication == null) {
-			throw new IllegalStateException("No hay autenticación.");
-		}
+    public static Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-		Object details = authentication.getDetails();
-		if (details instanceof JwtUserDetails jwtUserDetails) {
-			return jwtUserDetails.companyId();
-		}
+        if (authentication == null) {
+            throw new IllegalStateException("No hay autenticacion.");
+        }
 
-		throw new IllegalStateException("No se pudo obtener la empresa del token.");
-	}
+        Object details = authentication.getDetails();
+        if (details instanceof JwtUserDetails jwtUserDetails) {
+            return jwtUserDetails.userId();
+        }
 
-	public static Long getCurrentUserId() {
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        throw new IllegalStateException("No se pudo obtener userId del token.");
+    }
 
-		if (authentication == null) {
-			throw new IllegalStateException("No hay autenticación");
-		}
+    public static String getCurrentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-		Object details = authentication.getDetails();
+        if (authentication == null) {
+            throw new IllegalStateException("No hay autenticacion.");
+        }
 
-		if (details instanceof JwtUserDetails jwtUserDetails) {
-			return jwtUserDetails.userId();
-		}
+        Object details = authentication.getDetails();
+        if (details instanceof JwtUserDetails jwtUserDetails) {
+            return jwtUserDetails.role();
+        }
 
-		throw new IllegalStateException("No se pudo obtener userId del token");
-	}
+        throw new IllegalStateException("No se pudo obtener el rol del token.");
+    }
 
-	public static String getCurrentRole() {
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    public static TenantContext getCurrentTenant() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-		if (authentication == null) {
-			throw new IllegalStateException("No hay autenticacion");
-		}
+        if (authentication == null) {
+            throw new IllegalStateException("No hay autenticacion.");
+        }
 
-		Object details = authentication.getDetails();
+        Object details = authentication.getDetails();
+        if (details instanceof JwtUserDetails jwtUserDetails) {
+            return new TenantContext(
+                    jwtUserDetails.companyId(),
+                    jwtUserDetails.tenantCode(),
+                    jwtUserDetails.datasourceKey(),
+                    jwtUserDetails.databaseMode()
+            );
+        }
 
-		if (details instanceof JwtUserDetails jwtUserDetails) {
-			return jwtUserDetails.role();
-		}
-
-		throw new IllegalStateException("No se pudo obtener el rol del token");
-	}
+        throw new IllegalStateException("No se pudo obtener el tenant del token.");
+    }
 }

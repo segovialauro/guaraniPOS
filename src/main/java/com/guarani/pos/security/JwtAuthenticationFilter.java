@@ -16,6 +16,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.guarani.pos.tenant.TenantDataSourceContext;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -44,10 +45,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Claims claims = jwtService.extractAllClaims(token);
             Long userId = ((Number) claims.get("userId")).longValue();
             Long companyId = ((Number) claims.get("companyId")).longValue();
+            String tenantCode = claims.get("tenant", String.class);
+            String datasourceKey = claims.get("tenantDatasourceKey", String.class);
+            String databaseMode = claims.get("tenantDatabaseMode", String.class);
             String cedula = claims.getSubject();
             String role = claims.get("role", String.class);
 
-            JwtUserDetails jwtUserDetails = new JwtUserDetails(userId, companyId, cedula, role);
+            JwtUserDetails jwtUserDetails = new JwtUserDetails(
+                    userId,
+                    companyId,
+                    tenantCode,
+                    datasourceKey,
+                    databaseMode,
+                    cedula,
+                    role
+            );
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
                             cedula,
@@ -57,10 +69,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             authentication.setDetails(jwtUserDetails);
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            TenantDataSourceContext.setCurrentDatasourceKey(datasourceKey);
         } catch (Exception ex) {
             SecurityContextHolder.clearContext();
+            TenantDataSourceContext.clear();
         }
-
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantDataSourceContext.clear();
+        }
     }
 }

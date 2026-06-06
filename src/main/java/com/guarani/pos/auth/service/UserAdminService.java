@@ -61,12 +61,8 @@ public class UserAdminService {
 
     @Transactional
     public void changeStatus(Long companyId, Long userId, boolean active) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
-
-        if (!user.getCompany().getId().equals(companyId)) {
-            throw new IllegalArgumentException("No se puede modificar un usuario de otra empresa.");
-        }
 
         user.setStatus(active ? "ACTIVO" : "INACTIVO");
         userRepository.save(user);

@@ -83,27 +83,25 @@ public class PurchaseService {
 
     @Transactional(readOnly = true)
     public PurchaseSummaryResponse getSummary(Long companyId, Long userId) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_VER);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_VER);
 
         LocalDate firstDay = LocalDate.now().withDayOfMonth(1);
         LocalDate lastDay = firstDay.plusMonths(1).minusDays(1);
 
         BigDecimal monthlyTotal = nvl(purchaseRepository.sumTotalByDateRange(companyId, firstDay, lastDay));
         BigDecimal payableTotal = nvl(purchaseRepository.sumPayableBalance(companyId));
-        long pendingCount = purchaseRepository.countByCompanyIdAndBalanceGreaterThan(companyId, BigDecimal.ZERO);
-
-        List<Purchase> purchases = purchaseRepository.findTop50ByCompanyIdOrderByPurchaseDateDescCreatedAtDesc(companyId);
-        BigDecimal pendingTotal = purchases.stream()
-                .filter(p -> p.getBalance() != null && p.getBalance().compareTo(BigDecimal.ZERO) > 0)
-                .map(Purchase::getBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pendingTotal = nvl(purchaseRepository.sumPendingBalance(companyId));
+        long pendingCount = purchaseRepository.countByCompanyIdAndStatusAndBalanceGreaterThan(
+                companyId,
+                "PENDIENTE",
+                BigDecimal.ZERO);
 
         return new PurchaseSummaryResponse(monthlyTotal, pendingTotal, payableTotal, pendingCount);
     }
 
     @Transactional(readOnly = true)
     public List<PurchaseResponse> findAll(Long companyId, Long userId, String q, String status, String from, String to) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_VER);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_VER);
 
         String normalizedStatus = status != null && !status.isBlank()
                 ? status.trim().toUpperCase(Locale.ROOT)
@@ -122,7 +120,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse create(Long companyId, Long userId, PurchaseCreateRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_REGISTRAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_REGISTRAR);
 
         if (request.items() == null || request.items().isEmpty()) {
             throw new IllegalArgumentException("Debe agregar al menos un producto a la compra.");
@@ -144,7 +142,7 @@ public class PurchaseService {
 
         validateDuplicateInvoice(companyId, supplier.getId(), request.invoiceNumber().trim(), null);
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         Purchase purchase = new Purchase();
@@ -232,7 +230,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse update(Long companyId, Long userId, Long purchaseId, PurchaseUpdateRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_EDITAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_EDITAR);
 
         Purchase purchase = purchaseRepository.findByIdAndCompanyId(purchaseId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada."));
@@ -292,7 +290,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse receive(Long companyId, Long userId, Long purchaseId, PurchaseReceiveRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_REGISTRAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_REGISTRAR);
 
         Purchase purchase = purchaseRepository.findByIdAndCompanyId(purchaseId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada."));
@@ -305,7 +303,7 @@ public class PurchaseService {
             throw new IllegalArgumentException("Debe indicar al menos un producto a recepcionar.");
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         for (PurchaseReceiveItemRequest item : request.items()) {
@@ -353,12 +351,12 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse registerPayment(Long companyId, Long userId, Long purchaseId, PurchasePaymentRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_PAGAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_PAGAR);
 
         Purchase purchase = purchaseRepository.findByIdAndCompanyId(purchaseId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada."));
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         BigDecimal amount = nvl(request.amount());
@@ -399,7 +397,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse cancel(Long companyId, Long userId, Long purchaseId, PurchaseCancelRequest request) {
-        authorizationService.checkPermission(userId, PurchasePermission.COMPRAS_ANULAR);
+        authorizationService.checkPermission(companyId, userId, PurchasePermission.COMPRAS_ANULAR);
 
         Purchase purchase = purchaseRepository.findByIdAndCompanyId(purchaseId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada."));
@@ -412,7 +410,7 @@ public class PurchaseService {
             throw new IllegalArgumentException("No se puede anular una compra con pagos registrados.");
         }
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
 
         for (PurchaseDetail detail : purchase.getDetails()) {
@@ -555,13 +553,8 @@ public class PurchaseService {
     }
 
     private BigDecimal calculateAvailableCash(CashSession cashSession) {
-        LocalDateTime from = cashSession.getOpenedAt();
-        LocalDateTime to = LocalDateTime.now();
-
-        BigDecimal cashSales = nvl(salePaymentRepository.sumByCompanyPeriodAndPaymentMethod(
-                cashSession.getCompany().getId(),
-                from,
-                to,
+        BigDecimal cashSales = nvl(salePaymentRepository.sumByCashSessionAndPaymentMethod(
+                cashSession.getId(),
                 "EFECTIVO"
         ));
         BigDecimal manualIncome = nvl(cashMovementRepository.sumByCashSessionAndTypeAndStatus(
