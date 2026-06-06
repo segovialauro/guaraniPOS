@@ -48,4 +48,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByCompanyIdAndQuickPin(Long companyId, String quickPin);
 
     boolean existsByCompanyIdAndQuickPinAndIdNot(Long companyId, String quickPin, Long id);
+
+    Optional<User> findFirstByCompanyIdAndRoleCodeOrderByIdAsc(Long companyId, String roleCode);
 }

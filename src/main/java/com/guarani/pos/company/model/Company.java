@@ -38,20 +38,40 @@ public class Company {
 		return code;
 	}
 
+	public void setCode(String code) {
+		this.code = code;
+	}
+
 	public String getName() {
 		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
 	}
 
 	public String getStatus() {
 		return status;
 	}
 
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
 	public String getLicenseStatus() {
 		return licenseStatus;
 	}
 
+	public void setLicenseStatus(String licenseStatus) {
+		this.licenseStatus = licenseStatus;
+	}
+
 	public LocalDate getLicenseDueDate() {
 		return licenseDueDate;
+	}
+
+	public void setLicenseDueDate(LocalDate licenseDueDate) {
+		this.licenseDueDate = licenseDueDate;
 	}
 
 	public String getRuc() {
