@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.guarani.pos.auth.model.User;
 import com.guarani.pos.auth.repository.UserRepository;
+import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
+import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
@@ -107,6 +109,33 @@ public class ClientOnboardingService {
                 admin.getRoleCode(),
                 company.getStatus(),
                 company.getLicenseStatus());
+    }
+
+    @Transactional
+    public ClientAdminPasswordResetResponse resetAdminPassword(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId,
+            ClientAdminPasswordResetRequest request) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+
+        User admin = userRepository.findFirstByCompanyIdAndRoleCodeOrderByIdAsc(companyId, "ADMIN_EMPRESA")
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró un administrador principal para esta empresa."));
+
+        admin.setPasswordHash(passwordEncoder.encode(normalizeRequired(
+                request.newPassword(),
+                "La nueva contraseña es obligatoria.")));
+        userRepository.save(admin);
+
+        return new ClientAdminPasswordResetResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                admin.getCedula(),
+                admin.getFullName());
     }
 
     private ClientOnboardingSummaryResponse toSummaryResponse(Company company) {
