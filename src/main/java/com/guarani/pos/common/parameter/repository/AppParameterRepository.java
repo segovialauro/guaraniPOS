@@ -19,6 +19,8 @@ public interface AppParameterRepository extends JpaRepository<AppParameter, Long
 
     Optional<AppParameter> findByIdAndCompanyId(Long id, Long companyId);
 
+    Optional<AppParameter> findByCompanyIdAndGroupCodeAndCodeIgnoreCase(Long companyId, String groupCode, String code);
+
     boolean existsByCompanyIdAndGroupCodeAndCodeIgnoreCase(Long companyId, String groupCode, String code);
 
     boolean existsByCompanyIdAndGroupCodeAndCodeIgnoreCaseAndIdNot(Long companyId, String groupCode, String code, Long id);

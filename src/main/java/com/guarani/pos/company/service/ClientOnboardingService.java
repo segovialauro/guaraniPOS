@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.guarani.pos.auth.model.User;
+import com.guarani.pos.auth.service.TemporaryPasswordService;
 import com.guarani.pos.auth.repository.UserRepository;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
@@ -33,18 +34,21 @@ public class ClientOnboardingService {
     private final CompanySubscriptionRepository companySubscriptionRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TemporaryPasswordService temporaryPasswordService;
 
     public ClientOnboardingService(
             CompanyRepository companyRepository,
             SubscriptionPlanRepository subscriptionPlanRepository,
             CompanySubscriptionRepository companySubscriptionRepository,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            TemporaryPasswordService temporaryPasswordService) {
         this.companyRepository = companyRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.companySubscriptionRepository = companySubscriptionRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.temporaryPasswordService = temporaryPasswordService;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +101,7 @@ public class ClientOnboardingService {
         admin.setRoleCode("ADMIN_EMPRESA");
         admin.setStatus("ACTIVO");
         admin = userRepository.save(admin);
+        temporaryPasswordService.markRequired(company, admin);
 
         return toResponse(company, plan, admin);
     }
@@ -160,6 +165,7 @@ public class ClientOnboardingService {
                 request.newPassword(),
                 "La nueva contraseña es obligatoria.")));
         userRepository.save(admin);
+        temporaryPasswordService.markRequired(company, admin);
 
         return new ClientAdminPasswordResetResponse(
                 company.getId(),

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.guarani.pos.auth.dto.CurrentPermissionsResponse;
+import com.guarani.pos.auth.dto.ChangeTemporaryPasswordRequest;
 import com.guarani.pos.auth.dto.LoginRequest;
 import com.guarani.pos.auth.dto.LoginResponse;
 import com.guarani.pos.auth.dto.QuickPinRequest;
@@ -36,6 +37,15 @@ public class AuthController {
     @PostMapping("/quick-pin")
     public LoginResponse quickPin(@Valid @RequestBody QuickPinRequest request) {
         return authService.quickPin(request);
+    }
+
+    @PostMapping("/change-temporary-password")
+    public void changeTemporaryPassword(@Valid @RequestBody ChangeTemporaryPasswordRequest request) {
+        authService.changeTemporaryPassword(
+                SecurityUtils.getCurrentCompanyId(),
+                SecurityUtils.getCurrentUserId(),
+                request
+        );
     }
 
     @GetMapping("/me/permissions")

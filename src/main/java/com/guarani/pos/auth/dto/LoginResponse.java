@@ -6,5 +6,6 @@ public record LoginResponse(
         String companyName,
         Long userId,
         String fullName,
-        String role
+        String role,
+        boolean mustChangePassword
 ) {}

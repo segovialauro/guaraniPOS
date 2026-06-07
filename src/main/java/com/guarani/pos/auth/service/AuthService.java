@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.guarani.pos.auth.dto.LoginRequest;
 import com.guarani.pos.auth.dto.LoginResponse;
 import com.guarani.pos.auth.dto.QuickPinRequest;
+import com.guarani.pos.auth.dto.ChangeTemporaryPasswordRequest;
 import com.guarani.pos.auth.model.User;
 import com.guarani.pos.auth.repository.UserRepository;
 import com.guarani.pos.company.model.Company;
@@ -24,17 +25,20 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TenantRegistryService tenantRegistryService;
+    private final TemporaryPasswordService temporaryPasswordService;
 
     public AuthService(CompanyRepository companyRepository,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       TenantRegistryService tenantRegistryService) {
+                       TenantRegistryService tenantRegistryService,
+                       TemporaryPasswordService temporaryPasswordService) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.tenantRegistryService = tenantRegistryService;
+        this.temporaryPasswordService = temporaryPasswordService;
     }
 
     @Transactional(readOnly = true)
@@ -69,6 +73,17 @@ public class AuthService {
         return buildResponse(user);
     }
 
+    @Transactional
+    public void changeTemporaryPassword(Long companyId, Long userId, ChangeTemporaryPasswordRequest request) {
+        User user = userRepository.findByIdAndCompanyId(userId, companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado."));
+
+        String newPassword = normalizeRequired(request.newPassword(), "La nueva contraseña es obligatoria.");
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        temporaryPasswordService.clearRequired(companyId, userId);
+    }
+
     private Company resolveAndValidateCompany(String tenantCode) {
         TenantResolution tenant = tenantRegistryService.resolveByTenantCode(tenantCode);
         Company company = companyRepository.findById(tenant.companyId())
@@ -97,13 +112,15 @@ public class AuthService {
 
     private LoginResponse buildResponse(User user) {
         TenantResolution tenantResolution = tenantRegistryService.resolveByCompanyId(user.getCompany().getId());
+        boolean mustChangePassword = temporaryPasswordService.isRequired(user.getCompany().getId(), user.getId());
         return new LoginResponse(
                 jwtService.generateToken(user, tenantResolution),
                 user.getCompany().getCode(),
                 user.getCompany().getName(),
                 user.getId(),
                 user.getFullName(),
-                user.getRoleCode()
+                user.getRoleCode(),
+                mustChangePassword
         );
     }
 
