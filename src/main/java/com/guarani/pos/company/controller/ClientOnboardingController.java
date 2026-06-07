@@ -15,6 +15,7 @@ import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
+import com.guarani.pos.company.dto.ClientOnboardingUpdateRequest;
 import com.guarani.pos.company.service.ClientOnboardingService;
 import com.guarani.pos.security.SecurityUtils;
 
@@ -42,6 +43,17 @@ public class ClientOnboardingController {
         return clientOnboardingService.create(
                 SecurityUtils.getCurrentRole(),
                 SecurityUtils.getCurrentTenant().tenantCode(),
+                request);
+    }
+
+    @PatchMapping("/{companyId}")
+    public ClientOnboardingResponse update(
+            @PathVariable Long companyId,
+            @Valid @RequestBody ClientOnboardingUpdateRequest request) {
+        return clientOnboardingService.update(
+                SecurityUtils.getCurrentRole(),
+                SecurityUtils.getCurrentTenant().tenantCode(),
+                companyId,
                 request);
     }
 

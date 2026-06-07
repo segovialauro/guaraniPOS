@@ -15,6 +15,7 @@ import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
+import com.guarani.pos.company.dto.ClientOnboardingUpdateRequest;
 import com.guarani.pos.company.model.Company;
 import com.guarani.pos.company.repository.CompanyRepository;
 import com.guarani.pos.subscription.model.CompanySubscription;
@@ -97,18 +98,48 @@ public class ClientOnboardingService {
         admin.setStatus("ACTIVO");
         admin = userRepository.save(admin);
 
-        return new ClientOnboardingResponse(
-                company.getId(),
-                company.getCode(),
-                company.getName(),
-                company.getRuc(),
-                plan.getCode(),
-                plan.getName(),
-                admin.getCedula(),
-                admin.getFullName(),
-                admin.getRoleCode(),
-                company.getStatus(),
-                company.getLicenseStatus());
+        return toResponse(company, plan, admin);
+    }
+
+    @Transactional
+    public ClientOnboardingResponse update(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId,
+            ClientOnboardingUpdateRequest request) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+
+        CompanySubscription subscription = companySubscriptionRepository.findByCompany_IdAndStatus(companyId, "ACTIVE")
+                .orElseThrow(() -> new IllegalArgumentException("La empresa no tiene un plan activo para actualizar."));
+
+        SubscriptionPlan plan = subscriptionPlanRepository
+                .findByCodeIgnoreCase(normalizeRequired(request.planCode(), "El plan es obligatorio."))
+                .filter(SubscriptionPlan::isActive)
+                .orElseThrow(() -> new IllegalArgumentException("Plan no encontrado o inactivo."));
+
+        User admin = userRepository.findFirstByCompanyIdAndRoleCodeOrderByIdAsc(companyId, "ADMIN_EMPRESA")
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró un administrador principal para esta empresa."));
+
+        String normalizedCedula = normalizeRequired(request.adminCedula(), "La cédula del administrador es obligatoria.");
+        if (userRepository.existsByCompanyIdAndCedulaIgnoreCaseAndIdNot(companyId, normalizedCedula, admin.getId())) {
+            throw new IllegalArgumentException("Ya existe otro usuario activo con esa cédula en esta empresa.");
+        }
+
+        company.setName(normalizeRequired(request.companyName(), "El nombre de la empresa es obligatorio."));
+        company.setRuc(normalizeOptional(request.ruc()));
+        companyRepository.save(company);
+
+        subscription.setPlan(plan);
+        companySubscriptionRepository.save(subscription);
+
+        admin.setCedula(normalizedCedula);
+        admin.setFullName(normalizeRequired(request.adminFullName(), "El nombre del administrador es obligatorio."));
+        userRepository.save(admin);
+
+        return toResponse(company, plan, admin);
     }
 
     @Transactional
@@ -154,6 +185,21 @@ public class ClientOnboardingService {
                 subscription != null ? subscription.getPlan().getName() : "Sin plan activo",
                 admin != null ? admin.getCedula() : "-",
                 admin != null ? admin.getFullName() : "-",
+                company.getStatus(),
+                company.getLicenseStatus());
+    }
+
+    private ClientOnboardingResponse toResponse(Company company, SubscriptionPlan plan, User admin) {
+        return new ClientOnboardingResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                company.getRuc(),
+                plan.getCode(),
+                plan.getName(),
+                admin.getCedula(),
+                admin.getFullName(),
+                admin.getRoleCode(),
                 company.getStatus(),
                 company.getLicenseStatus());
     }
