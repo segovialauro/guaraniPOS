@@ -69,6 +69,12 @@ public class BillingConfigService {
         config.setTimbradoNumber(trimToNull(request.timbradoNumber()));
         config.setTimbradoValidity(trimToNull(request.timbradoValidity()));
         config.setInvoiceNumber(trimToNull(request.invoiceNumber()));
+        config.setTaxpayerType(trimToNull(request.taxpayerType()));
+        config.setTaxRegimeCode(trimToNull(request.taxRegimeCode()));
+        config.setEconomicActivityCode(trimToNull(request.economicActivityCode()));
+        config.setQrSecurityCodeId(trimToNull(request.qrSecurityCodeId()));
+        config.setQrSecurityCode(trimToNull(request.qrSecurityCode()));
+        config.setElectronicSeries(trimToNull(normalizeSeries(request.electronicSeries())));
         config.setLogoDataUrl(trimToNull(request.logoDataUrl()));
         config.setShowSeller(request.showSeller());
         config.setShowVatBreakdown(request.showVatBreakdown());
@@ -96,10 +102,32 @@ public class BillingConfigService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private String normalizeSeries(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toUpperCase(Locale.ROOT);
+    }
+
     private void validateFiscalRules(BillingConfigRequest request) {
         LocalDate validityDate = LocalDate.parse(request.timbradoValidity());
         if (validityDate.isBefore(LocalDate.now())) {
             throw new IllegalArgumentException("La vigencia del timbrado ya esta vencida.");
+        }
+
+        if ("ELECTRONICO".equalsIgnoreCase(request.documentType())) {
+            if (trimToNull(request.taxpayerType()) == null) {
+                throw new IllegalArgumentException("Debe indicar el tipo de contribuyente para factura electronica.");
+            }
+            if (trimToNull(request.taxRegimeCode()) == null) {
+                throw new IllegalArgumentException("Debe indicar el regimen tributario para factura electronica.");
+            }
+            if (trimToNull(request.economicActivityCode()) == null) {
+                throw new IllegalArgumentException("Debe indicar el codigo de actividad economica para factura electronica.");
+            }
+            if (trimToNull(request.qrSecurityCodeId()) == null) {
+                throw new IllegalArgumentException("Debe indicar el Id CSC para factura electronica.");
+            }
+            if (trimToNull(request.qrSecurityCode()) == null) {
+                throw new IllegalArgumentException("Debe indicar el CSC para factura electronica.");
+            }
         }
     }
 
@@ -123,6 +151,12 @@ public class BillingConfigService {
                 config.getTimbradoNumber(),
                 config.getTimbradoValidity(),
                 config.getInvoiceNumber(),
+                config.getTaxpayerType(),
+                config.getTaxRegimeCode(),
+                config.getEconomicActivityCode(),
+                config.getQrSecurityCodeId(),
+                config.getQrSecurityCode(),
+                config.getElectronicSeries(),
                 config.getLogoDataUrl(),
                 config.isShowSeller(),
                 config.isShowVatBreakdown(),

@@ -78,6 +78,24 @@ public class BillingConfig {
     @Column(name = "invoice_number", length = 50)
     private String invoiceNumber;
 
+    @Column(name = "taxpayer_type", length = 1)
+    private String taxpayerType;
+
+    @Column(name = "tax_regime_code", length = 1)
+    private String taxRegimeCode;
+
+    @Column(name = "economic_activity_code", length = 20)
+    private String economicActivityCode;
+
+    @Column(name = "qr_security_code_id", length = 4)
+    private String qrSecurityCodeId;
+
+    @Column(name = "qr_security_code", length = 32)
+    private String qrSecurityCode;
+
+    @Column(name = "electronic_series", length = 2)
+    private String electronicSeries;
+
     @Column(name = "logo_data_url", columnDefinition = "TEXT")
     private String logoDataUrl;
 
@@ -253,6 +271,54 @@ public class BillingConfig {
 
     public void setInvoiceNumber(String invoiceNumber) {
         this.invoiceNumber = invoiceNumber;
+    }
+
+    public String getTaxpayerType() {
+        return taxpayerType;
+    }
+
+    public void setTaxpayerType(String taxpayerType) {
+        this.taxpayerType = taxpayerType;
+    }
+
+    public String getTaxRegimeCode() {
+        return taxRegimeCode;
+    }
+
+    public void setTaxRegimeCode(String taxRegimeCode) {
+        this.taxRegimeCode = taxRegimeCode;
+    }
+
+    public String getEconomicActivityCode() {
+        return economicActivityCode;
+    }
+
+    public void setEconomicActivityCode(String economicActivityCode) {
+        this.economicActivityCode = economicActivityCode;
+    }
+
+    public String getQrSecurityCodeId() {
+        return qrSecurityCodeId;
+    }
+
+    public void setQrSecurityCodeId(String qrSecurityCodeId) {
+        this.qrSecurityCodeId = qrSecurityCodeId;
+    }
+
+    public String getQrSecurityCode() {
+        return qrSecurityCode;
+    }
+
+    public void setQrSecurityCode(String qrSecurityCode) {
+        this.qrSecurityCode = qrSecurityCode;
+    }
+
+    public String getElectronicSeries() {
+        return electronicSeries;
+    }
+
+    public void setElectronicSeries(String electronicSeries) {
+        this.electronicSeries = electronicSeries;
     }
 
     public String getLogoDataUrl() {

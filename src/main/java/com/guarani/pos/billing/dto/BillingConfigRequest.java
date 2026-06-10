@@ -75,6 +75,27 @@ public record BillingConfigRequest(
         )
         String invoiceNumber,
 
+        @Pattern(regexp = "^[12]$", message = "El tipo de contribuyente debe ser 1 o 2.")
+        String taxpayerType,
+
+        @Pattern(regexp = "^[1-8]$", message = "El regimen tributario debe tener un codigo valido.")
+        String taxRegimeCode,
+
+        @Size(max = 20)
+        String economicActivityCode,
+
+        @Pattern(regexp = "^\\d{4}$", message = "El Id CSC debe tener 4 digitos.")
+        String qrSecurityCodeId,
+
+        @Pattern(
+                regexp = "^[A-Za-z0-9]{32}$",
+                message = "El CSC debe contener 32 caracteres alfanumericos."
+        )
+        String qrSecurityCode,
+
+        @Pattern(regexp = "^[A-Z]{2}$", message = "La serie electronica debe tener dos letras mayusculas.")
+        String electronicSeries,
+
         String logoDataUrl,
 
         boolean showSeller,

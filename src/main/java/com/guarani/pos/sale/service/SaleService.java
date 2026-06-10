@@ -37,6 +37,8 @@ import com.guarani.pos.company.model.Company;
 import com.guarani.pos.company.repository.CompanyRepository;
 import com.guarani.pos.customer.model.Customer;
 import com.guarani.pos.customer.repository.CustomerRepository;
+import com.guarani.pos.electronicinvoice.model.ElectronicInvoice;
+import com.guarani.pos.electronicinvoice.service.ElectronicInvoiceService;
 import com.guarani.pos.inventory.model.InventoryMovement;
 import com.guarani.pos.inventory.repository.InventoryMovementRepository;
 import com.guarani.pos.product.model.Product;
@@ -91,6 +93,7 @@ public class SaleService {
     private final BillingConfigRepository billingConfigRepository;
     private final SubscriptionAccessService subscriptionAccessService;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final ElectronicInvoiceService electronicInvoiceService;
 
     public SaleService(SaleRepository saleRepository,
                        SalePaymentRepository salePaymentRepository,
@@ -102,7 +105,8 @@ public class SaleService {
                        AuthorizationService authorizationService,
                        BillingConfigRepository billingConfigRepository,
                        SubscriptionAccessService subscriptionAccessService,
-                       InventoryMovementRepository inventoryMovementRepository) {
+                       InventoryMovementRepository inventoryMovementRepository,
+                       ElectronicInvoiceService electronicInvoiceService) {
         this.saleRepository = saleRepository;
         this.salePaymentRepository = salePaymentRepository;
         this.productRepository = productRepository;
@@ -114,6 +118,7 @@ public class SaleService {
         this.billingConfigRepository = billingConfigRepository;
         this.subscriptionAccessService = subscriptionAccessService;
         this.inventoryMovementRepository = inventoryMovementRepository;
+        this.electronicInvoiceService = electronicInvoiceService;
     }
 
     @Transactional(readOnly = true)
@@ -417,6 +422,11 @@ public class SaleService {
         updateCashSessionTotals(cashSession, paymentRequests, total);
 
         Sale saved = saleRepository.save(sale);
+        if ("ELECTRONICO".equalsIgnoreCase(saved.getFiscalDocumentType())) {
+            BillingConfig config = billingConfigRepository.findFirstByCompany_IdOrderByIdDesc(companyId)
+                    .orElseThrow(() -> new IllegalArgumentException("No existe configuracion de facturacion electronica."));
+            electronicInvoiceService.createDraftForSale(saved, config);
+        }
         salePaymentRepository.flush();
         return toResponse(saved);
     }
@@ -886,6 +896,7 @@ public class SaleService {
         String companyRuc = sale.getCompany() != null ? sale.getCompany().getRuc() : "-";
         String customerName = sale.getCustomer() != null ? sale.getCustomer().getNombre() : "Cliente contado";
         String cashierName = sale.getCreatedBy() != null ? sale.getCreatedBy().getFullName() : "-";
+        ElectronicInvoice electronicInvoice = electronicInvoiceService.findEntityBySale(companyId, saleId).orElse(null);
 
         return new SaleTicketResponse(
                 sale.getId(),
@@ -901,6 +912,9 @@ public class SaleService {
                 sale.getFiscalTimbradoNumber(),
                 sale.getFiscalEstablishmentCode(),
                 sale.getFiscalExpeditionPoint(),
+                electronicInvoice != null ? electronicInvoice.getCdc() : null,
+                electronicInvoice != null ? electronicInvoice.getQrUrl() : null,
+                electronicInvoice != null ? electronicInvoice.getStatus() : null,
                 sale.getEstado(),
                 sale.getObservacion(),
                 sale.getSubtotal(),
