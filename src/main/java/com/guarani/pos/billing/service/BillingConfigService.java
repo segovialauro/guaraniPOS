@@ -32,8 +32,8 @@ public class BillingConfigService {
     @Transactional(readOnly = true)
     public BillingConfigResponse getCurrent(Long companyId) {
         return billingConfigRepository.findFirstByCompany_IdOrderByIdDesc(companyId)
-                .map(this::toResponse)
-                .orElse(null);
+                .map(config -> toResponse(companyId, config))
+                .orElseGet(() -> emptyResponse(companyId));
     }
 
     @Transactional
@@ -82,7 +82,7 @@ public class BillingConfigService {
         config.setShowItemDiscount(request.showItemDiscount());
         config.setActive(request.active());
 
-        return toResponse(billingConfigRepository.save(config));
+        return toResponse(companyId, billingConfigRepository.save(config));
     }
 
     private void validatePlanAccess(Long companyId, String documentType) {
@@ -131,7 +131,49 @@ public class BillingConfigService {
         }
     }
 
-    private BillingConfigResponse toResponse(BillingConfig config) {
+    private BillingConfigResponse emptyResponse(Long companyId) {
+        boolean electronicAllowed = isElectronicInvoiceAllowed(companyId);
+        return new BillingConfigResponse(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                electronicAllowed ? "NO_CONFIGURADO" : "PLAN_REQUERIDO",
+                electronicAllowed
+                        ? "Aun no configuraste la factura electronica. Puedes cargar los datos SIFEN y dejarla lista para cuando tengas la firma digital."
+                        : "Tu plan actual no incluye factura electronica. Debes pasar a Premium para habilitar esta configuracion.",
+                null,
+                false,
+                false,
+                false,
+                false,
+                false
+        );
+    }
+
+    private BillingConfigResponse toResponse(Long companyId, BillingConfig config) {
+        String setupStatus = resolveElectronicSetupStatus(companyId, config);
+        String setupMessage = resolveElectronicSetupMessage(setupStatus);
         return new BillingConfigResponse(
                 config.getId(),
                 config.getDocumentType(),
@@ -157,6 +199,8 @@ public class BillingConfigService {
                 config.getQrSecurityCodeId(),
                 config.getQrSecurityCode(),
                 config.getElectronicSeries(),
+                setupStatus,
+                setupMessage,
                 config.getLogoDataUrl(),
                 config.isShowSeller(),
                 config.isShowVatBreakdown(),
@@ -164,5 +208,60 @@ public class BillingConfigService {
                 config.isShowItemDiscount(),
                 config.isActive()
         );
+    }
+
+    private String resolveElectronicSetupStatus(Long companyId, BillingConfig config) {
+        if (!isElectronicInvoiceAllowed(companyId)) {
+            return "PLAN_REQUERIDO";
+        }
+        if (!"ELECTRONICO".equalsIgnoreCase(config.getDocumentType())) {
+            return "NO_CONFIGURADO";
+        }
+        if (!hasElectronicCoreData(config)) {
+            return "CONFIGURACION_INCOMPLETA";
+        }
+        return "PENDIENTE_FIRMA_DIGITAL";
+    }
+
+    private String resolveElectronicSetupMessage(String status) {
+        return switch (status) {
+            case "PLAN_REQUERIDO" ->
+                    "Tu plan actual no incluye factura electronica. Debes pasar a Premium para habilitar esta configuracion.";
+            case "NO_CONFIGURADO" ->
+                    "La empresa aun no activo la modalidad electronica. Puedes cargar los datos preparatorios cuando quieras.";
+            case "CONFIGURACION_INCOMPLETA" ->
+                    "Faltan datos SIFEN obligatorios. Completa la configuracion fiscal antes de intentar emitir electronicamente.";
+            case "PENDIENTE_FIRMA_DIGITAL" ->
+                    "La base SIFEN ya esta cargada. El siguiente paso es obtener y vincular la firma digital para pasar a homologacion/emision.";
+            default ->
+                    "Estado de configuracion electronica no determinado.";
+        };
+    }
+
+    private boolean hasElectronicCoreData(BillingConfig config) {
+        return trimToNull(config.getCommercialName()) != null
+                && trimToNull(config.getLegalName()) != null
+                && trimToNull(config.getRuc()) != null
+                && trimToNull(config.getAddress()) != null
+                && trimToNull(config.getBranchName()) != null
+                && trimToNull(config.getTimbradoNumber()) != null
+                && trimToNull(config.getTimbradoValidity()) != null
+                && trimToNull(config.getInvoiceNumber()) != null
+                && trimToNull(config.getEstablishmentCode()) != null
+                && trimToNull(config.getExpeditionPoint()) != null
+                && trimToNull(config.getTaxpayerType()) != null
+                && trimToNull(config.getTaxRegimeCode()) != null
+                && trimToNull(config.getEconomicActivityCode()) != null
+                && trimToNull(config.getQrSecurityCodeId()) != null
+                && trimToNull(config.getQrSecurityCode()) != null;
+    }
+
+    private boolean isElectronicInvoiceAllowed(Long companyId) {
+        try {
+            subscriptionAccessService.validateElectronicInvoiceEnabled(companyId);
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 }

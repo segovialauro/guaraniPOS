@@ -25,6 +25,8 @@ public record BillingConfigResponse(
         String qrSecurityCodeId,
         String qrSecurityCode,
         String electronicSeries,
+        String electronicSetupStatus,
+        String electronicSetupMessage,
         String logoDataUrl,
         boolean showSeller,
         boolean showVatBreakdown,
