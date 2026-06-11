@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.guarani.pos.auth.model.User;
 import com.guarani.pos.auth.service.TemporaryPasswordService;
+import com.guarani.pos.auth.service.LoginAttemptGuardService;
 import com.guarani.pos.auth.repository.UserRepository;
+import com.guarani.pos.company.dto.ClientAccessUnlockResponse;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
@@ -35,6 +37,7 @@ public class ClientOnboardingService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TemporaryPasswordService temporaryPasswordService;
+    private final LoginAttemptGuardService loginAttemptGuardService;
 
     public ClientOnboardingService(
             CompanyRepository companyRepository,
@@ -42,13 +45,15 @@ public class ClientOnboardingService {
             CompanySubscriptionRepository companySubscriptionRepository,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            TemporaryPasswordService temporaryPasswordService) {
+            TemporaryPasswordService temporaryPasswordService,
+            LoginAttemptGuardService loginAttemptGuardService) {
         this.companyRepository = companyRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.companySubscriptionRepository = companySubscriptionRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.temporaryPasswordService = temporaryPasswordService;
+        this.loginAttemptGuardService = loginAttemptGuardService;
     }
 
     @Transactional(readOnly = true)
@@ -168,6 +173,30 @@ public class ClientOnboardingService {
         temporaryPasswordService.markRequired(company, admin);
 
         return new ClientAdminPasswordResetResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                admin.getCedula(),
+                admin.getFullName());
+    }
+
+    @Transactional
+    public ClientAccessUnlockResponse unlockClientAccess(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+
+        User admin = userRepository.findFirstByCompanyIdAndRoleCodeOrderByIdAsc(companyId, "ADMIN_EMPRESA")
+                .orElseThrow(() -> new IllegalArgumentException("No se encontro un administrador principal para esta empresa."));
+
+        loginAttemptGuardService.clearLoginFailuresBySubject(company.getCode(), admin.getCedula());
+        loginAttemptGuardService.clearQuickPinFailuresByTenant(company.getCode());
+
+        return new ClientAccessUnlockResponse(
                 company.getId(),
                 company.getCode(),
                 company.getName(),

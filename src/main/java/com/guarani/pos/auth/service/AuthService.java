@@ -26,50 +26,63 @@ public class AuthService {
     private final JwtService jwtService;
     private final TenantRegistryService tenantRegistryService;
     private final TemporaryPasswordService temporaryPasswordService;
+    private final LoginAttemptGuardService loginAttemptGuardService;
+    private final AuthSecurityAuditService authSecurityAuditService;
 
     public AuthService(CompanyRepository companyRepository,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        TenantRegistryService tenantRegistryService,
-                       TemporaryPasswordService temporaryPasswordService) {
+                       TemporaryPasswordService temporaryPasswordService,
+                       LoginAttemptGuardService loginAttemptGuardService,
+                       AuthSecurityAuditService authSecurityAuditService) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.tenantRegistryService = tenantRegistryService;
         this.temporaryPasswordService = temporaryPasswordService;
+        this.loginAttemptGuardService = loginAttemptGuardService;
+        this.authSecurityAuditService = authSecurityAuditService;
     }
 
     @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String clientIp) {
         String tenantCode = normalizeRequired(request.tenantCode(), "El codigo de empresa es obligatorio.");
         String cedula = normalizeRequired(request.cedula(), "La cedula es obligatoria.");
         String password = normalizeRequired(request.password(), "La contrasena es obligatoria.");
 
+        loginAttemptGuardService.checkLoginAllowed(tenantCode, cedula, clientIp);
+
         Company company = resolveAndValidateCompany(tenantCode);
         User user = userRepository.findByCompanyIdAndCedula(company.getId(), cedula)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario o contrasena invalidos."));
+                .orElseThrow(() -> invalidLogin(tenantCode, cedula, clientIp));
 
         validateActiveUser(user);
 
         if (!matchesPassword(password, user.getPasswordHash())) {
-            throw new IllegalArgumentException("Usuario o contrasena invalidos.");
+            throw invalidLogin(tenantCode, cedula, clientIp);
         }
 
+        loginAttemptGuardService.clearLoginFailures(tenantCode, cedula, clientIp);
         return buildResponse(user);
     }
 
     @Transactional(readOnly = true)
-    public LoginResponse quickPin(QuickPinRequest request) {
+    public LoginResponse quickPin(QuickPinRequest request, String clientIp) {
         String tenantCode = normalizeRequired(request.tenantCode(), "El codigo de empresa es obligatorio.");
         String pin = normalizeRequired(request.pin(), "El PIN es obligatorio.");
 
+        loginAttemptGuardService.checkQuickPinAllowed(tenantCode, clientIp);
+
         Company company = resolveAndValidateCompany(tenantCode);
         User user = userRepository.findByCompanyIdAndQuickPin(company.getId(), pin)
-                .orElseThrow(() -> new IllegalArgumentException("PIN invalido."));
+                .orElseThrow(() -> invalidQuickPin(tenantCode, clientIp));
 
         validateActiveUser(user);
+        validateQuickPinAccess(user, tenantCode, clientIp);
+        loginAttemptGuardService.clearQuickPinFailures(tenantCode, clientIp);
         return buildResponse(user);
     }
 
@@ -110,6 +123,20 @@ public class AuthService {
         }
     }
 
+    private void validateQuickPinAccess(User user, String tenantCode, String clientIp) {
+        String roleCode = user.getRoleCode() == null ? "" : user.getRoleCode().trim().toUpperCase();
+        if ("ADMIN_EMPRESA".equals(roleCode)) {
+            authSecurityAuditService.registerPolicyRejection(
+                    tenantCode,
+                    "QUICK_PIN",
+                    user.getCedula(),
+                    clientIp,
+                    "Intento de uso de PIN rapido por un usuario administrador."
+            );
+            throw new IllegalArgumentException("El acceso rapido por PIN solo esta habilitado para cajeros y supervisores.");
+        }
+    }
+
     private LoginResponse buildResponse(User user) {
         TenantResolution tenantResolution = tenantRegistryService.resolveByCompanyId(user.getCompany().getId());
         boolean mustChangePassword = temporaryPasswordService.isRequired(user.getCompany().getId(), user.getId());
@@ -137,5 +164,15 @@ public class AuthService {
         } catch (IllegalArgumentException ex) {
             return false;
         }
+    }
+
+    private IllegalArgumentException invalidLogin(String tenantCode, String cedula, String clientIp) {
+        loginAttemptGuardService.registerLoginFailure(tenantCode, cedula, clientIp);
+        return new IllegalArgumentException("Usuario o contrasena invalidos.");
+    }
+
+    private IllegalArgumentException invalidQuickPin(String tenantCode, String clientIp) {
+        loginAttemptGuardService.registerQuickPinFailure(tenantCode, clientIp);
+        return new IllegalArgumentException("PIN invalido.");
     }
 }

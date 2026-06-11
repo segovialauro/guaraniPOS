@@ -16,6 +16,7 @@ import com.guarani.pos.auth.service.AuthorizationService;
 import com.guarani.pos.security.SecurityUtils;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,13 +31,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        return authService.login(request, resolveClientIp(httpRequest));
     }
 
     @PostMapping("/quick-pin")
-    public LoginResponse quickPin(@Valid @RequestBody QuickPinRequest request) {
-        return authService.quickPin(request);
+    public LoginResponse quickPin(@Valid @RequestBody QuickPinRequest request, HttpServletRequest httpRequest) {
+        return authService.quickPin(request, resolveClientIp(httpRequest));
     }
 
     @PostMapping("/change-temporary-password")
@@ -56,5 +57,13 @@ public class AuthController {
                         SecurityUtils.getCurrentUserId()
                 )
         );
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
