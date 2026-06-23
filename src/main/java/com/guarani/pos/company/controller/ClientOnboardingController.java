@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientAccessUnlockResponse;
+import com.guarani.pos.company.dto.ClientCommercialStatusUpdateResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
@@ -72,6 +73,22 @@ public class ClientOnboardingController {
     @PostMapping("/{companyId}/unlock-access")
     public ClientAccessUnlockResponse unlockAccess(@PathVariable Long companyId) {
         return clientOnboardingService.unlockClientAccess(
+                SecurityUtils.getCurrentRole(),
+                SecurityUtils.getCurrentTenant().tenantCode(),
+                companyId);
+    }
+
+    @PostMapping("/{companyId}/suspend")
+    public ClientCommercialStatusUpdateResponse suspendClient(@PathVariable Long companyId) {
+        return clientOnboardingService.suspendClient(
+                SecurityUtils.getCurrentRole(),
+                SecurityUtils.getCurrentTenant().tenantCode(),
+                companyId);
+    }
+
+    @PostMapping("/{companyId}/reactivate")
+    public ClientCommercialStatusUpdateResponse reactivateClient(@PathVariable Long companyId) {
+        return clientOnboardingService.reactivateClient(
                 SecurityUtils.getCurrentRole(),
                 SecurityUtils.getCurrentTenant().tenantCode(),
                 companyId);

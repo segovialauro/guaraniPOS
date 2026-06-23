@@ -17,14 +17,17 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.guarani.pos.tenant.TenantDataSourceContext;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final CompanyAccessGuardService companyAccessGuardService;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, CompanyAccessGuardService companyAccessGuardService) {
         this.jwtService = jwtService;
+        this.companyAccessGuardService = companyAccessGuardService;
     }
 
     @Override
@@ -70,7 +73,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(jwtUserDetails);
             SecurityContextHolder.getContext().setAuthentication(authentication);
             TenantDataSourceContext.setCurrentDatasourceKey(datasourceKey);
+            companyAccessGuardService.validateAuthenticatedAccess(companyId, userId, tenantCode);
         } catch (Exception ex) {
+            if (SecurityContextHolder.getContext().getAuthentication() != null) {
+                writeAccessDenied(response, ex.getMessage());
+                SecurityContextHolder.clearContext();
+                TenantDataSourceContext.clear();
+                return;
+            }
             SecurityContextHolder.clearContext();
             TenantDataSourceContext.clear();
         }
@@ -79,5 +89,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } finally {
             TenantDataSourceContext.clear();
         }
+    }
+
+    private void writeAccessDenied(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        String safeMessage = message == null || message.isBlank()
+                ? "Acceso denegado por politica de licencia o suscripcion."
+                : message.replace("\"", "\\\"");
+        response.getWriter().write("{\"error\":\"FORBIDDEN\",\"message\":\"" + safeMessage + "\"}");
     }
 }

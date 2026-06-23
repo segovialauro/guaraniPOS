@@ -1,5 +1,7 @@
 package com.guarani.pos.company.dto;
 
+import java.time.LocalDate;
+
 public record ClientOnboardingSummaryResponse(
         Long companyId,
         String tenantCode,
@@ -10,6 +12,8 @@ public record ClientOnboardingSummaryResponse(
         String adminCedula,
         String adminFullName,
         String companyStatus,
-        String licenseStatus
+        String licenseStatus,
+        String subscriptionStatus,
+        LocalDate licenseDueDate
 ) {
 }

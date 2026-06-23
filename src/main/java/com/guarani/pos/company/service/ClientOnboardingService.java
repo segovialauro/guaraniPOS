@@ -15,6 +15,7 @@ import com.guarani.pos.auth.repository.UserRepository;
 import com.guarani.pos.company.dto.ClientAccessUnlockResponse;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
+import com.guarani.pos.company.dto.ClientCommercialStatusUpdateResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
@@ -204,9 +205,71 @@ public class ClientOnboardingService {
                 admin.getFullName());
     }
 
+    @Transactional
+    public ClientCommercialStatusUpdateResponse suspendClient(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+
+        validateNotPrincipalTenant(company.getCode());
+
+        CompanySubscription subscription = companySubscriptionRepository.findFirstByCompany_IdOrderByStartDateDesc(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("La empresa no tiene una suscripcion registrada."));
+
+        company.setStatus("SUSPENDIDA");
+        company.setLicenseStatus("SUSPENDIDA");
+        companyRepository.save(company);
+
+        subscription.setStatus("SUSPENDED");
+        companySubscriptionRepository.save(subscription);
+
+        return new ClientCommercialStatusUpdateResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                company.getStatus(),
+                company.getLicenseStatus(),
+                subscription.getStatus());
+    }
+
+    @Transactional
+    public ClientCommercialStatusUpdateResponse reactivateClient(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+
+        validateNotPrincipalTenant(company.getCode());
+
+        CompanySubscription subscription = companySubscriptionRepository.findFirstByCompany_IdOrderByStartDateDesc(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("La empresa no tiene una suscripcion registrada."));
+
+        company.setStatus("ACTIVA");
+        company.setLicenseStatus("ACTIVA");
+        companyRepository.save(company);
+
+        subscription.setStatus("ACTIVE");
+        companySubscriptionRepository.save(subscription);
+
+        return new ClientCommercialStatusUpdateResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                company.getStatus(),
+                company.getLicenseStatus(),
+                subscription.getStatus());
+    }
+
     private ClientOnboardingSummaryResponse toSummaryResponse(Company company) {
         CompanySubscription subscription = companySubscriptionRepository
-                .findFirstByCompany_IdAndStatusOrderByStartDateDesc(company.getId(), "ACTIVE")
+                .findFirstByCompany_IdOrderByStartDateDesc(company.getId())
                 .orElse(null);
         User admin = userRepository.findFirstByCompanyIdAndRoleCodeOrderByIdAsc(company.getId(), "ADMIN_EMPRESA")
                 .orElse(null);
@@ -221,7 +284,9 @@ public class ClientOnboardingService {
                 admin != null ? admin.getCedula() : "-",
                 admin != null ? admin.getFullName() : "-",
                 company.getStatus(),
-                company.getLicenseStatus());
+                company.getLicenseStatus(),
+                subscription != null ? subscription.getStatus() : "SIN_SUSCRIPCION",
+                company.getLicenseDueDate());
     }
 
     private ClientOnboardingResponse toResponse(Company company, SubscriptionPlan plan, User admin) {
@@ -236,7 +301,8 @@ public class ClientOnboardingService {
                 admin.getFullName(),
                 admin.getRoleCode(),
                 company.getStatus(),
-                company.getLicenseStatus());
+                company.getLicenseStatus(),
+                company.getLicenseDueDate());
     }
 
     private void validateCanManageOnboarding(String currentRole, String currentTenantCode) {
@@ -249,6 +315,12 @@ public class ClientOnboardingService {
 
         if (!PRINCIPAL_TENANT_CODE.equals(normalizedTenant)) {
             throw new IllegalArgumentException("Solo el tenant principal puede dar de alta nuevas empresas.");
+        }
+    }
+
+    private void validateNotPrincipalTenant(String tenantCode) {
+        if (tenantCode != null && PRINCIPAL_TENANT_CODE.equalsIgnoreCase(tenantCode.trim())) {
+            throw new IllegalArgumentException("No se puede suspender ni reactivar el tenant principal desde este modulo.");
         }
     }
 
