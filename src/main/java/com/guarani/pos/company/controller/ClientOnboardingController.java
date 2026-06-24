@@ -14,6 +14,9 @@ import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientAccessUnlockResponse;
 import com.guarani.pos.company.dto.ClientCommercialStatusUpdateResponse;
+import com.guarani.pos.company.dto.ClientLicenseHistoryResponse;
+import com.guarani.pos.company.dto.ClientLicenseUpdateRequest;
+import com.guarani.pos.company.dto.ClientLicenseUpdateResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
@@ -92,5 +95,25 @@ public class ClientOnboardingController {
                 SecurityUtils.getCurrentRole(),
                 SecurityUtils.getCurrentTenant().tenantCode(),
                 companyId);
+    }
+
+    @GetMapping("/{companyId}/license-history")
+    public List<ClientLicenseHistoryResponse> getLicenseHistory(@PathVariable Long companyId) {
+        return clientOnboardingService.getLicenseHistory(
+                SecurityUtils.getCurrentRole(),
+                SecurityUtils.getCurrentTenant().tenantCode(),
+                companyId);
+    }
+
+    @PatchMapping("/{companyId}/license")
+    public ClientLicenseUpdateResponse updateLicenseDueDate(
+            @PathVariable Long companyId,
+            @Valid @RequestBody ClientLicenseUpdateRequest request) {
+        return clientOnboardingService.updateLicenseDueDate(
+                SecurityUtils.getCurrentRole(),
+                SecurityUtils.getCurrentTenant().tenantCode(),
+                SecurityUtils.getCurrentUserId(),
+                companyId,
+                request);
     }
 }

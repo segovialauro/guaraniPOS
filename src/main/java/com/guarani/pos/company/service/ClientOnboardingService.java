@@ -1,6 +1,7 @@
 package com.guarani.pos.company.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -16,11 +17,16 @@ import com.guarani.pos.company.dto.ClientAccessUnlockResponse;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetRequest;
 import com.guarani.pos.company.dto.ClientAdminPasswordResetResponse;
 import com.guarani.pos.company.dto.ClientCommercialStatusUpdateResponse;
+import com.guarani.pos.company.dto.ClientLicenseHistoryResponse;
+import com.guarani.pos.company.dto.ClientLicenseUpdateRequest;
+import com.guarani.pos.company.dto.ClientLicenseUpdateResponse;
 import com.guarani.pos.company.dto.ClientOnboardingRequest;
 import com.guarani.pos.company.dto.ClientOnboardingResponse;
 import com.guarani.pos.company.dto.ClientOnboardingSummaryResponse;
 import com.guarani.pos.company.dto.ClientOnboardingUpdateRequest;
 import com.guarani.pos.company.model.Company;
+import com.guarani.pos.company.model.CompanyLicenseHistory;
+import com.guarani.pos.company.repository.CompanyLicenseHistoryRepository;
 import com.guarani.pos.company.repository.CompanyRepository;
 import com.guarani.pos.subscription.model.CompanySubscription;
 import com.guarani.pos.subscription.model.SubscriptionPlan;
@@ -35,6 +41,7 @@ public class ClientOnboardingService {
     private final CompanyRepository companyRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final CompanyLicenseHistoryRepository companyLicenseHistoryRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TemporaryPasswordService temporaryPasswordService;
@@ -44,6 +51,7 @@ public class ClientOnboardingService {
             CompanyRepository companyRepository,
             SubscriptionPlanRepository subscriptionPlanRepository,
             CompanySubscriptionRepository companySubscriptionRepository,
+            CompanyLicenseHistoryRepository companyLicenseHistoryRepository,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             TemporaryPasswordService temporaryPasswordService,
@@ -51,6 +59,7 @@ public class ClientOnboardingService {
         this.companyRepository = companyRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.companySubscriptionRepository = companySubscriptionRepository;
+        this.companyLicenseHistoryRepository = companyLicenseHistoryRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.temporaryPasswordService = temporaryPasswordService;
@@ -265,6 +274,76 @@ public class ClientOnboardingService {
                 company.getStatus(),
                 company.getLicenseStatus(),
                 subscription.getStatus());
+    }
+
+    @Transactional
+    public ClientLicenseUpdateResponse updateLicenseDueDate(
+            String currentRole,
+            String currentTenantCode,
+            Long currentUserId,
+            Long companyId,
+            ClientLicenseUpdateRequest request) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa no encontrada."));
+        User actor = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario autenticado no encontrado."));
+
+        validateNotPrincipalTenant(company.getCode());
+
+        LocalDate newDueDate = request.licenseDueDate();
+        if (newDueDate == null) {
+            throw new IllegalArgumentException("La nueva fecha de vencimiento es obligatoria.");
+        }
+
+        if (newDueDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La nueva fecha de vencimiento no puede ser anterior a hoy.");
+        }
+
+        LocalDate previousDueDate = company.getLicenseDueDate();
+        company.setLicenseDueDate(newDueDate);
+
+        if (!"SUSPENDIDA".equalsIgnoreCase(company.getStatus())) {
+            company.setLicenseStatus("ACTIVA");
+        }
+
+        companyRepository.save(company);
+        if (previousDueDate != null && !previousDueDate.equals(newDueDate)) {
+            CompanyLicenseHistory history = new CompanyLicenseHistory();
+            history.setCompany(company);
+            history.setChangedBy(actor);
+            history.setPreviousDueDate(previousDueDate);
+            history.setNewDueDate(newDueDate);
+            history.setChangedAt(LocalDateTime.now());
+            companyLicenseHistoryRepository.save(history);
+        }
+
+        return new ClientLicenseUpdateResponse(
+                company.getId(),
+                company.getCode(),
+                company.getName(),
+                company.getStatus(),
+                company.getLicenseStatus(),
+                company.getLicenseDueDate());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClientLicenseHistoryResponse> getLicenseHistory(
+            String currentRole,
+            String currentTenantCode,
+            Long companyId) {
+        validateCanManageOnboarding(currentRole, currentTenantCode);
+
+        return companyLicenseHistoryRepository.findTop10ByCompany_IdOrderByChangedAtDesc(companyId).stream()
+                .map(history -> new ClientLicenseHistoryResponse(
+                        history.getId(),
+                        history.getPreviousDueDate(),
+                        history.getNewDueDate(),
+                        history.getChangedAt(),
+                        history.getChangedBy() != null ? history.getChangedBy().getCedula() : "-",
+                        history.getChangedBy() != null ? history.getChangedBy().getFullName() : "Usuario no disponible"))
+                .toList();
     }
 
     private ClientOnboardingSummaryResponse toSummaryResponse(Company company) {
